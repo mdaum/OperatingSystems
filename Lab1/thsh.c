@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
@@ -54,10 +55,28 @@ main (int argc, char ** argv, char **envp) {
 	if((strncmp(cmd,"exit",4)==0)&&(strlen(cmd)==5)){ //if cmd is exit, we successfully exit
 		exit(EXIT_SUCCESS);
 	}
-	
-    write(1, cmd, strnlen(cmd, MAX_INPUT));
+    else{ //runcommand
+		
+	}
 	
   }
 
   return 0;
 }
+
+
+int runcommand(char* cmd){
+	pid_t child_PID;
+	int child_Status
+	if((child_PID=fork())<0){//error forking child
+		write(1,"ERROR FORKING CHILD PROCESS",strlen("ERROR FORKING CHILD PROCESS"));
+		exit(EXIT_FAILURE);
+	}
+	else if(pid==0){//child runs execvp...dont forget to check if this fails this...
+		
+	}
+	else{//parent waiting....
+	
+	}
+}
+
