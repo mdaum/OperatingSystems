@@ -15,14 +15,11 @@ int runcommand(char* line){
     int i;
     for (i = 0; cmd != NULL; i++) {
         argv[i] = cmd;
-        puts(cmd);
         cmd = strtok(NULL, " \n\t()<>|&;");
     }
 
     argv[i] = NULL;
     char* file = argv[0];
-    puts(file);
-    puts(argv[0]);
 
     if((strncmp(file,"exit",4)==0)&&(strlen(file)==4)){ 
         //if cmd is exit, we successfully exit
@@ -38,7 +35,8 @@ int runcommand(char* line){
     else if(pid==0){//child runs execvp...dont forget to check if this fails this...
         if (execvp(file,argv) == -1) {
             write(1,"Could not find file specified, or invalid args.",
-                    strlen("Could not find file specified, or invalid args."));
+            strlen("Could not find file specified, or invalid args."));
+			exit(EXIT_FAILURE);
   }
     }
     else{//parent waiting....
@@ -91,6 +89,7 @@ main (int argc, char ** argv, char **envp) {
 
         // Execute the command, handling built-in commands separately
         // Just echo the command line for now
+		if(strncmp(cmd,"\n",1)==0)continue;
         runcommand(cmd);
 
     }
