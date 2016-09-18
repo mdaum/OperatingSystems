@@ -9,6 +9,44 @@
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
 
+char** get_args(char* line) {
+    if (line[0] == '\n') {
+        return NULL;
+    }
+    char** args = malloc(MAX_INPUT / 2);
+    char* cmd = strndup(line, (int)(strchr(line, ' ') - line));
+    cmd = strtok(line, " ");
+    int i;
+    
+    for (i = 0; cmd != NULL; i++) {
+        args[i] = cmd;
+        cmd = strtok(NULL, " ");
+    }
+
+    args[i] = NULL;
+	
+    return args;
+}
+
+int runcommand(char* file,char** args){
+	int pid=fork();
+	int child_Status;
+	if(pid<0){//error forking child
+		write(1,"ERROR FORKING CHILD PROCESS",strlen("ERROR FORKING CHILD PROCESS"));
+		exit(EXIT_FAILURE);
+	}
+	else if(pid==0){//child runs execvp...dont forget to check if this fails this...
+		int exec_status = execvp(file,args);
+		printf("%d",exec_status);
+		write(1,"Could not find file specified, or invalid args.",strlen("Could not find file specified, or invalid args."));
+	}
+	else{//parent waiting....
+		child_Status=wait(pid);
+		write(1,"successfull execvp",strlen("successfull execvp"));
+	}
+}
+
+
 int
 main (int argc, char ** argv, char **envp) {
 
@@ -49,14 +87,15 @@ main (int argc, char ** argv, char **envp) {
       break;
     }
 
-
+	char** args=get_args(cmd);
     // Execute the command, handling built-in commands separately
     // Just echo the command line for now
-	if((strncmp(cmd,"exit",4)==0)&&(strlen(cmd)==5)){ //if cmd is exit, we successfully exit
+	if(((strncmp(args[0],"exit\n",5)==0)&&(strlen(args[0])==5))||
+	((strncmp(args[0],"exit",4)==0)&&(strlen(args[0])==4))){ //if cmd is exit, we successfully exit
 		exit(EXIT_SUCCESS);
 	}
     else{ //runcommand
-		
+		runcommand(args[0],args+1);
 	}
 	
   }
@@ -64,19 +103,4 @@ main (int argc, char ** argv, char **envp) {
   return 0;
 }
 
-
-int runcommand(char* cmd){
-	pid_t child_PID;
-	int child_Status
-	if((child_PID=fork())<0){//error forking child
-		write(1,"ERROR FORKING CHILD PROCESS",strlen("ERROR FORKING CHILD PROCESS"));
-		exit(EXIT_FAILURE);
-	}
-	else if(pid==0){//child runs execvp...dont forget to check if this fails this...
-		
-	}
-	else{//parent waiting....
-	
-	}
-}
 
