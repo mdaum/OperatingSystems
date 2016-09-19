@@ -25,6 +25,10 @@ int runcommand(char* line){
         //if cmd is exit, we successfully exit
         exit(EXIT_SUCCESS);
     }
+	if((strncmp(file,"pwd",3)==0)&&(strlen(file)==3)){ //pwd returns 1
+		free(argv);
+		return 1;
+	}
 
     int pid=fork();
     int child_Status;
@@ -34,8 +38,8 @@ int runcommand(char* line){
     }
     else if(pid==0){//child runs execvp...dont forget to check if this fails this...
         if (execvp(file,argv) == -1) {
-            write(1,"Could not find file specified, or invalid args.",
-            strlen("Could not find file specified, or invalid args."));
+            write(1,"Could not find file specified, or invalid args.\n",
+            strlen("Could not find file specified, or invalid args.\n"));
 			exit(EXIT_FAILURE);
   }
     }
@@ -53,8 +57,9 @@ main (int argc, char ** argv, char **envp) {
     int finished = 0;
     char *prompt = "thsh> ";
     char cmd[MAX_INPUT];
-
-
+	char* cwd;//current working directory,
+	getcwd(cwd,4096); //apparently pathMax in linux
+	
     while (!finished) {
         char *cursor;
         char last_char;
@@ -63,6 +68,9 @@ main (int argc, char ** argv, char **envp) {
 
 
         // Print the prompt
+		write(1,"[",1);
+		write(1,cwd,strlen(cwd));
+		write(1,"] ",2);
         rv = write(1, prompt, strlen(prompt));
         if (!rv) {
             finished = 1;
@@ -90,7 +98,11 @@ main (int argc, char ** argv, char **envp) {
         // Execute the command, handling built-in commands separately
         // Just echo the command line for now
 		if(strncmp(cmd,"\n",1)==0)continue;
-        runcommand(cmd);
+        int status = runcommand(cmd);
+		if(status==1){ //pwd
+			write(1,cwd,strlen(cwd));
+		}
+		
 
     }
 
