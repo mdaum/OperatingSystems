@@ -4,7 +4,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <sys/stat.h>
 
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
@@ -29,15 +28,15 @@ int runcommand(char* line){
     int pid=fork();
     int child_Status;
     if(pid<0){//error forking child
-        write(1,"ERROR FORKING CHILD PROCESS",strlen("ERROR FORKING CHILD PROCESS"));
+        write(1,"ERROR FORKING CHILD PROCESS\n",strlen("ERROR FORKING CHILD PROCESS\n"));
         exit(EXIT_FAILURE);
     }
     else if(pid==0){//child runs execvp...dont forget to check if this fails this...
         if (execvp(file,argv) == -1) {
-            write(1,"Could not find file specified, or invalid args.",
-            strlen("Could not find file specified, or invalid args."));
-			exit(EXIT_FAILURE);
-  }
+            write(1,"Could not find file specified, or invalid args.\n",
+                    strlen("Could not find file specified, or invalid args.\n"));
+            exit(EXIT_FAILURE);
+        }
     }
     else{//parent waiting....
         child_Status= wait(&pid);
@@ -89,7 +88,7 @@ main (int argc, char ** argv, char **envp) {
 
         // Execute the command, handling built-in commands separately
         // Just echo the command line for now
-		if(strncmp(cmd,"\n",1)==0)continue;
+        if(strncmp(cmd,"\n",1)==0)continue;
         runcommand(cmd);
 
     }
