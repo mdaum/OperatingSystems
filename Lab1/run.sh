@@ -1,3 +1,1 @@
-rm a.out
-gcc thsh.c
-./a.out
+gcc -o thsh thsh.c && ./thsh -d

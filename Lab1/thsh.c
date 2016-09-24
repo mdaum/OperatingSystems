@@ -8,6 +8,8 @@
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
 
+int debugging = 0;
+
 int runcommand(char* line){
     char** argv = malloc(MAX_INPUT / 2);
     char* cmd = strtok(line, " \n\t()<>|&;");
@@ -24,38 +26,38 @@ int runcommand(char* line){
         //if cmd is exit, we successfully exit
         exit(EXIT_SUCCESS);
     }
-	
-	//begin cd block
-	if((strncmp(file,"cd",2)==0)&&(strlen(file)==2)){
-		if(argv[2]!=NULL){ //too many args
-			write(1,"cd: Too many arguments.\n",strlen("cd: Too many arguments.\n")); free(argv); return 0;//no more action needed...
-		}
-		int cdStat;
-		if(argv[1]==NULL||(strncmp(argv[1],"~",1)==0)&&strlen(argv[1])==1){ //cd or cd ~
-			cdStat=chdir(getenv("HOME"));
-			if(cdStat<0){
-				write(1,"cd: failed to change to home directory.\n",strlen("cd: failed to change to home directory.\n"));
-				free(argv);
-				return 0;
-			}
-			free(argv);
-			return 1;
-		}
-		if((strncmp(argv[1],"-",1)==0)&&(strlen(argv[1])==1)){ //cd -
-			free(argv);
-			return 2; //special status
-		}
-		cdStat=chdir(argv[1]); //normal cd
-		if(cdStat<0){
-			write(1,"cd: not a valid directory.\n",strlen("cd: not a valid directory.\n"));
-			free(argv);
-			return 0;
-		}
-		free(argv);
-		return 1;//success
-	}
-	//end cd block
-	
+
+    //begin cd block
+    if((strncmp(file,"cd",2)==0)&&(strlen(file)==2)){
+        if(argv[2]!=NULL){ //too many args
+            write(1,"cd: Too many arguments.\n",strlen("cd: Too many arguments.\n")); free(argv); return 0;//no more action needed...
+        }
+        int cdStat;
+        if((argv[1]==NULL||(strncmp(argv[1],"~",1))==0)&&strlen(argv[1])==1){ //cd or cd ~
+            cdStat=chdir(getenv("HOME"));
+            if(cdStat<0){
+                write(1,"cd: failed to change to home directory.\n",strlen("cd: failed to change to home directory.\n"));
+                free(argv);
+                return 0;
+            }
+            free(argv);
+            return 1;
+        }
+        if((strncmp(argv[1],"-",1)==0)&&(strlen(argv[1])==1)){ //cd -
+            free(argv);
+            return 2; //special status
+        }
+        cdStat=chdir(argv[1]); //normal cd
+        if(cdStat<0){
+            write(1,"cd: not a valid directory.\n",strlen("cd: not a valid directory.\n"));
+            free(argv);
+            return 0;
+        }
+        free(argv);
+        return 1;//success
+    }
+    //end cd block
+
     int pid=fork();
     int child_Status;
     if(pid<0){//error forking child
@@ -63,30 +65,45 @@ int runcommand(char* line){
         exit(EXIT_FAILURE);
     }
     else if(pid==0){//child runs execvp...dont forget to check if this fails this...
+        if (debugging) {
+            char running[MAX_INPUT + sizeof("RUNNING: \n")];
+            sprintf(running, "RUNNING: %s\n", argv[0]);
+            write(1, running, strlen(running));
+        }
         if (execvp(file,argv) == -1) {
             write(1,"Could not find file specified, or invalid args.\n",
-            strlen("Could not find file specified, or invalid args.\n"));
-			exit(0);
-  }
+                    strlen("Could not find file specified, or invalid args.\n"));
+            exit(0);
+        }
     }
     else{//parent waiting....
         child_Status= wait(&pid);
+        if (debugging) {
+            char ended[MAX_INPUT + sizeof("ENDED:  (ret=)\n")];
+            sprintf(ended, "ENDED: %s (ret=%d)\n", argv[0], child_Status);
+            write(1, ended, strlen(ended));
+        }
     }
     free(argv);
     return 0;
 }
 
 
-int
-main (int argc, char ** argv, char **envp) {
+int main (int argc, char ** argv, char **envp) {
 
     int finished = 0;
     char *prompt = "thsh> ";
     char cmd[MAX_INPUT];
-	char cwd[4096];//current working directory,
-	getcwd(cwd,4096); //apparently pathMax in linux
-	char lastPath[4096];//represents last path..
-	
+    char cwd[4096];//current working directory,
+    getcwd(cwd,4096); //apparently pathMax in linux
+    char lastPath[4096];//represents last path..
+
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "-d") == 0) {
+            debugging = 1;
+        }
+    }
+
     while (!finished) {
         char *cursor;
         char last_char;
@@ -95,9 +112,9 @@ main (int argc, char ** argv, char **envp) {
 
 
         // Print the prompt, but cwd first...
-		write(1,"[",1);
-		write(1,cwd,strlen(cwd));
-		write(1,"] ",2);
+        write(1,"[",1);
+        write(1,cwd,strlen(cwd));
+        write(1,"] ",2);
         rv = write(1, prompt, strlen(prompt));
         if (!rv) {
             finished = 1;
@@ -124,20 +141,20 @@ main (int argc, char ** argv, char **envp) {
 
         // Execute the command, handling built-in commands separately
         // Just echo the command line for now
-		if(strncmp(cmd,"\n",1)==0)continue;	//if they just type in enter
+        if(strncmp(cmd,"\n",1)==0)continue;	//if they just type in enter
         int status = runcommand(cmd); //read status of runcommand....we can handle special commands in main space too now
-		
-		if(status==1){//cd (already changed dir) so now update cwd;
-			strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
-			getcwd(cwd,4096); //update cwd...
-		}
-		
-		if(status==2){//cd - special case....
-			if(chdir(lastPath)<0)write(1,"cd: cd - failed.\n",strlen("cd: cd - failed.\n"));
-			strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
-			getcwd(cwd,4096); //update cwd...
-		}
-		
+
+        if(status==1){//cd (already changed dir) so now update cwd;
+            strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
+            getcwd(cwd,4096); //update cwd...
+        }
+
+        if(status==2){//cd - special case....
+            if(chdir(lastPath)<0)write(1,"cd: cd - failed.\n",strlen("cd: cd - failed.\n"));
+            strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
+            getcwd(cwd,4096); //update cwd...
+        }
+
 
     }
 
