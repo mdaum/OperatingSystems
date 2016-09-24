@@ -25,11 +25,38 @@ int runcommand(char* line){
         //if cmd is exit, we successfully exit
         exit(EXIT_SUCCESS);
     }
-	if((strncmp(file,"pwd",3)==0)&&(strlen(file)==3)){ //pwd returns 1
+	
+	//begin cd block
+	if((strncmp(file,"cd",2)==0)&&(strlen(file)==2)){
+		if(argv[2]!=NULL){ //too many args
+			write(1,"cd: Too many arguments.\n",strlen("cd: Too many arguments.\n")); free(argv); return 0;//no more action needed...
+		}
+		int cdStat;
+		if(argv[1]==NULL||(strncmp(argv[1],"~",1)==0)&&strlen(argv[1])==1){ //cd or cd ~
+			cdStat=chdir(getenv("HOME"));
+			if(cdStat<0){
+				write(1,"cd: failed to change to home directory.\n",strlen("cd: failed to change to home directory.\n"));
+				free(argv);
+				return 0;
+			}
+			free(argv);
+			return 1;
+		}
+		if((strncmp(argv[1],"-",1)==0)&&(strlen(argv[1])==1)){ //cd -
+			free(argv);
+			return 2; //special status
+		}
+		cdStat=chdir(argv[1]); //normal cd
+		if(cdStat<0){
+			write(1,"cd: not a valid directory.\n",strlen("cd: not a valid directory.\n"));
+			free(argv);
+			return 0;
+		}
 		free(argv);
-		return 1;
+		return 1;//success
 	}
-
+	//end cd block
+	
     int pid=fork();
     int child_Status;
     if(pid<0){//error forking child
@@ -40,7 +67,7 @@ int runcommand(char* line){
         if (execvp(file,argv) == -1) {
             write(1,"Could not find file specified, or invalid args.\n",
             strlen("Could not find file specified, or invalid args.\n"));
-			exit(EXIT_FAILURE);
+			exit(0);
   }
     }
     else{//parent waiting....
@@ -57,8 +84,9 @@ main (int argc, char ** argv, char **envp) {
     int finished = 0;
     char *prompt = "thsh> ";
     char cmd[MAX_INPUT];
-	char* cwd;//current working directory,
+	char cwd[4096];//current working directory,
 	getcwd(cwd,4096); //apparently pathMax in linux
+	char lastPath[4096];//represents last path..
 	
     while (!finished) {
         char *cursor;
@@ -67,7 +95,7 @@ main (int argc, char ** argv, char **envp) {
         int count;
 
 
-        // Print the prompt
+        // Print the prompt, but cwd first...
 		write(1,"[",1);
 		write(1,cwd,strlen(cwd));
 		write(1,"] ",2);
@@ -97,10 +125,18 @@ main (int argc, char ** argv, char **envp) {
 
         // Execute the command, handling built-in commands separately
         // Just echo the command line for now
-		if(strncmp(cmd,"\n",1)==0)continue;
-        int status = runcommand(cmd);
-		if(status==1){ //pwd
-			write(1,cwd,strlen(cwd));
+		if(strncmp(cmd,"\n",1)==0)continue;	//if they just type in enter
+        int status = runcommand(cmd); //read status of runcommand....we can handle special commands in main space too now
+		
+		if(status==1){//cd (already changed dir) so now update cwd;
+			strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
+			getcwd(cwd,4096); //update cwd...
+		}
+		
+		if(status==2){//cd - special case....
+			if(chdir(lastPath)<0)write(1,"cd: cd - failed.\n",strlen("cd: cd - failed.\n"));
+			strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
+			getcwd(cwd,4096); //update cwd...
 		}
 		
 
