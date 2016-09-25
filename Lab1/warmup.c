@@ -7,6 +7,13 @@ This assignment was submitted late due to extension granted by Professor Porter.
 Extension was to Tuesday 9/6
 I have complied with all the rules of the honor code in completing this assignment.
 */
+void printLine(char *c){ //pass in pointer to start of line
+    int i;
+    for(i=0;i<81;i++){  //print each char
+        putchar(*(c+i));
+    }
+}
+
 int main(){
     int counter=0;
     char curr; //current character I am processing
@@ -54,9 +61,4 @@ int main(){
 
 }
 
-void printLine(char *c){ //pass in pointer to start of line
-    int i;
-    for(i=0;i<81;i++){  //print each char
-        putchar(*(c+i));
-    }
-}
+
