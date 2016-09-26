@@ -45,6 +45,20 @@ int runcommand(char* line){
             free(argv);
             return 1;
         }
+		if((strncmp(argv[1],"~",1)==0)){ //cd ~X
+			char p[4096]; 
+			strcat(p,getenv("HOME"));
+			strcat(p,argv[1]+sizeof(char));//append all but ~ to home path...
+			cdStat=chdir(p);
+			memset(p,0,sizeof p); // because stupid strcat....
+			if(cdStat<0){
+				write(1,"cd: not a valid directory.\n",strlen("cd: not a valid directory.\n"));
+				free(argv);
+				return 0;
+			}
+			free(argv);
+			return 1;//success
+		}
         if((strncmp(argv[1],"-",1)==0)&&(strlen(argv[1])==1)){ //cd -
             free(argv);
             return 2; //special status
@@ -99,8 +113,8 @@ int main (int argc, char ** argv, char **envp) {
     char cwd[4096];//current working directory,
     getcwd(cwd,4096); //apparently pathMax in linux
     char lastPath[4096];//represents last path..
-
-    for (int i = 0; i < argc; i++) {
+    int i;
+    for (i = 0; i < argc; i++) {
         if (strcmp(argv[i], "-d") == 0) {
             debugging = 1;
         }
