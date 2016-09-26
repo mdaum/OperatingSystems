@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
