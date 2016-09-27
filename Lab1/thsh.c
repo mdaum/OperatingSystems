@@ -12,17 +12,33 @@
 
 int debugging = 0;
 
+char* parsevariable(char* variable) {
+    char* tmp = variable + 1;
+    return getenv(tmp);
+}
+
 int runcommand(char* line){
     char** argv = malloc(MAX_INPUT / 2);
     char* cmd = strtok(line, " \n\t()<>|&;");
     int i;
     for (i = 0; cmd != NULL; i++) {
-        argv[i] = cmd;
+        if (!strncmp(cmd, "$", 1)) {
+            argv[i] = parsevariable(cmd);
+        } else {
+            argv[i] = cmd;
+        }
         cmd = strtok(NULL, " \n\t()<>|&;");
     }
 
     argv[i] = NULL;
     char* file = argv[0];
+
+    if (!strncmp(file, "set", 3) && strlen(file) == 3) {
+        char* envname = strtok(argv[1], "=");
+        char* envval = strtok(NULL, "=");
+        setenv(envname, envval, 1);
+        return 0;
+    }
 
     if((strncmp(file,"exit",4)==0)&&(strlen(file)==4)){ 
         //if cmd is exit, we successfully exit
@@ -45,20 +61,20 @@ int runcommand(char* line){
             free(argv);
             return 1;
         }
-		if((strncmp(argv[1],"~",1)==0)){ //cd ~X
-			char p[4096]; 
-			strcat(p,getenv("HOME"));
-			strcat(p,argv[1]+sizeof(char));//append all but ~ to home path...
-			cdStat=chdir(p);
-			memset(p,0,sizeof p); // because stupid strcat....
-			if(cdStat<0){
-				write(1,"cd: not a valid directory.\n",strlen("cd: not a valid directory.\n"));
-				free(argv);
-				return 0;
-			}
-			free(argv);
-			return 1;//success
-		}
+        if((strncmp(argv[1],"~",1)==0)){ //cd ~X
+            char p[4096]; 
+            strcat(p,getenv("HOME"));
+            strcat(p,argv[1]+sizeof(char));//append all but ~ to home path...
+            cdStat=chdir(p);
+            memset(p,0,sizeof p); // because stupid strcat....
+            if(cdStat<0){
+                write(1,"cd: not a valid directory.\n",strlen("cd: not a valid directory.\n"));
+                free(argv);
+                return 0;
+            }
+            free(argv);
+            return 1;//success
+        }
         if((strncmp(argv[1],"-",1)==0)&&(strlen(argv[1])==1)){ //cd -
             free(argv);
             return 2; //special status
@@ -75,7 +91,7 @@ int runcommand(char* line){
     //end cd block
 
     int pid=fork();
-    int child_Status;
+    int child_status;
     if(pid<0){//error forking child
         write(1,"ERROR FORKING CHILD PROCESS\n",strlen("ERROR FORKING CHILD PROCESS\n"));
         exit(EXIT_FAILURE);
@@ -93,13 +109,17 @@ int runcommand(char* line){
         }
     }
     else{//parent waiting....
-        child_Status= wait(&pid);
+        waitpid(pid, &child_status, 0);
+        char tmp[30];
+        sprintf(tmp, "%d", child_status);
+        setenv("?", tmp, 1);
         if (debugging) {
             char ended[MAX_INPUT + sizeof("ENDED:  (ret=)\n")];
-            sprintf(ended, "ENDED: %s (ret=%d)\n", argv[0], child_Status);
+            sprintf(ended, "ENDED: %s (ret=%d)\n", argv[0], child_status);
             write(1, ended, strlen(ended));
         }
     }
+    //set $? environment variable
     free(argv);
     return 0;
 }
@@ -125,7 +145,6 @@ int main (int argc, char ** argv, char **envp) {
         char last_char;
         int rv;
         int count;
-
 
         // Print the prompt, but cwd first...
         write(1,"[",1);
@@ -176,5 +195,4 @@ int main (int argc, char ** argv, char **envp) {
 
     return 0;
 }
-
 
