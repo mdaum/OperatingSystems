@@ -11,19 +11,16 @@
 #define MAX_INPUT 1024
 
 int debugging = 0;
+char cwd[4096];//current working directory,
+char lastPath[4096];
 
-char* parsevariable(char* variable) {
-    char* tmp = variable + 1;
-    return getenv(tmp);
-}
-
-int runcommand(char* line){
+char** parsecommand(char* line) {
     char** argv = malloc(MAX_INPUT / 2);
     char* cmd = strtok(line, " \n\t()<>|&;");
     int i;
     for (i = 0; cmd != NULL; i++) {
         if (!strncmp(cmd, "$", 1)) {
-            argv[i] = parsevariable(cmd);
+            argv[i] = getenv(++cmd);
         } else {
             argv[i] = cmd;
         }
@@ -31,37 +28,41 @@ int runcommand(char* line){
     }
 
     argv[i] = NULL;
-    char* file = argv[0];
+    return argv;
+}
 
-    if (!strncmp(file, "set", 3) && strlen(file) == 3) {
+int exitinternal(char** argv) {
+    if((strncmp(argv[0],"exit",4)==0)&&(strlen(argv[0])==4)){ 
+        exit(EXIT_SUCCESS);
+    }
+    return 1;
+}
+
+int setinternal(char** argv) {
+    if (!strncmp(argv[0], "set", 3) && strlen(argv[0]) == 3) {
         char* envname = strtok(argv[1], "=");
         char* envval = strtok(NULL, "=");
         setenv(envname, envval, 1);
         return 0;
     }
+    return 1;
+}
 
-    if((strncmp(file,"exit",4)==0)&&(strlen(file)==4)){ 
-        //if cmd is exit, we successfully exit
-        exit(EXIT_SUCCESS);
-    }
-
-    //begin cd block
-    if((strncmp(file,"cd",2)==0)&&(strlen(file)==2)){
-        if(argv[2]!=NULL){ //too many args
-            write(1,"cd: Too many arguments.\n",strlen("cd: Too many arguments.\n")); free(argv); return 0;//no more action needed...
-        }
+int cdinternal(char** argv) {
+    if((strncmp(argv[0],"cd",2)==0)&&(strlen(argv[0])==2)){
         int cdStat;
-        if((argv[1]==NULL||(strncmp(argv[1],"~",1))==0)&&strlen(argv[1])==1){ //cd or cd ~
+        if(argv[2]!=NULL){ //too many args
+            write(1,"cd: Too many arguments.\n",strlen("cd: Too many arguments.\n"));
+            return 0;//no more action needed...
+        } else if((argv[1]==NULL||(strncmp(argv[1],"~",1))==0)&&strlen(argv[1])==1){ //cd or cd ~
             cdStat=chdir(getenv("HOME"));
             if(cdStat<0){
                 write(1,"cd: failed to change to home directory.\n",strlen("cd: failed to change to home directory.\n"));
                 free(argv);
                 return 0;
             }
-            free(argv);
-            return 1;
-        }
-        if((strncmp(argv[1],"~",1)==0)){ //cd ~X
+            strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
+        } else if((strncmp(argv[1],"~",1)==0)){ //cd ~X
             char p[4096]; 
             strcat(p,getenv("HOME"));
             strcat(p,argv[1]+sizeof(char));//append all but ~ to home path...
@@ -72,23 +73,33 @@ int runcommand(char* line){
                 free(argv);
                 return 0;
             }
-            free(argv);
-            return 1;//success
+            strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
+        } else if((strncmp(argv[1],"-",1)==0)&&(strlen(argv[1])==1)){ //cd -
+            if(chdir(lastPath)<0)write(1,"cd: cd - failed.\n",strlen("cd: cd - failed.\n"));
+            strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
+        } else {
+            cdStat=chdir(argv[1]); //normal cd
+            if(cdStat<0){
+                write(1,"cd: not a valid directory.\n",strlen("cd: not a valid directory.\n"));
+                return 0;
+            }
         }
-        if((strncmp(argv[1],"-",1)==0)&&(strlen(argv[1])==1)){ //cd -
-            free(argv);
-            return 2; //special status
-        }
-        cdStat=chdir(argv[1]); //normal cd
-        if(cdStat<0){
-            write(1,"cd: not a valid directory.\n",strlen("cd: not a valid directory.\n"));
-            free(argv);
-            return 0;
-        }
-        free(argv);
-        return 1;//success
+
+        getcwd(cwd,4096); //update cwd...
+        return 0;
     }
-    //end cd block
+    return 1;
+}
+
+int runinternal(char** argv) {
+    if (!exitinternal(argv)) return 0;
+    if (!setinternal(argv)) return 0;
+    if (!cdinternal(argv)) return 0;
+    return 1;
+}
+
+int runbinary(char** argv){
+    if (!runinternal(argv)) return 0;
 
     int pid=fork();
     int child_status;
@@ -102,7 +113,7 @@ int runcommand(char* line){
             sprintf(running, "RUNNING: %s\n", argv[0]);
             write(1, running, strlen(running));
         }
-        if (execvp(file,argv) == -1) {
+        if (execvp(argv[0],argv) == -1) {
             write(1,"Could not find file specified, or invalid args.\n",
                     strlen("Could not find file specified, or invalid args.\n"));
             exit(0);
@@ -130,11 +141,11 @@ int main (int argc, char ** argv, char **envp) {
     int finished = 0;
     char *prompt = "thsh> ";
     char cmd[MAX_INPUT];
-    char cwd[4096];//current working directory,
+
     getcwd(cwd,4096); //apparently pathMax in linux
-    char lastPath[4096];//represents last path..
+
     int i;
-    for (i = 0; i < argc; i++) {
+    for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], "-d") == 0) {
             debugging = 1;
         }
@@ -177,19 +188,7 @@ int main (int argc, char ** argv, char **envp) {
         // Execute the command, handling built-in commands separately
         // Just echo the command line for now
         if(strncmp(cmd,"\n",1)==0)continue;	//if they just type in enter
-        int status = runcommand(cmd); //read status of runcommand....we can handle special commands in main space too now
-
-        if(status==1){//cd (already changed dir) so now update cwd;
-            strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
-            getcwd(cwd,4096); //update cwd...
-        }
-
-        if(status==2){//cd - special case....
-            if(chdir(lastPath)<0)write(1,"cd: cd - failed.\n",strlen("cd: cd - failed.\n"));
-            strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
-            getcwd(cwd,4096); //update cwd...
-        }
-
+        int status = runbinary(parsecommand(cmd)); //read status of runcommand....we can handle special commands in main space too now
 
     }
 
