@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
@@ -20,11 +21,11 @@ char lastPath[4096]; //previous working directory
 
 
 int strWhiteSpace(const char *s){
-	while(*s!='\0'){
-		if(!isspace(*s))return 0;
-		s++;
-	}
-	return 1;
+    while(*s!='\0'){
+        if(!isspace(*s))return 0;
+        s++;
+    }
+    return 1;
 }
 
 char** parsecommand(char* line) { //parses a single command
@@ -117,7 +118,7 @@ int cdinternal(char** argv) { //internal cd command
                         strlen("cd: not a valid directory.\n"));
                 return 0;
             }
-			strncpy(lastPath, cwd, sizeof(cwd)); //save off previous cwd...
+            strncpy(lastPath, cwd, sizeof(cwd)); //save off previous cwd...
         }
         getcwd(cwd,4096); //update cwd...
         return 0;
@@ -281,10 +282,10 @@ int runcommands(char*** commands) { //run list of piped commands
 
 
 int main (int argc, char ** argv, char **envp) {
-	char* script_name;
-	int script_handle;
-	int script_mode=0;
-	int toRead=0; //either stdin or handle for script
+    char* script_name;
+    int script_handle;
+    int script_mode=0;
+    int toRead=0; //either stdin or handle for script
     int finished = 0;
     char *prompt = "thsh> ";
     char cmd[MAX_INPUT];
@@ -296,23 +297,23 @@ int main (int argc, char ** argv, char **envp) {
         if (strncmp(argv[i], "-d", 2) == 0 && strlen(argv[i]) == 2) {
             debugging = 1;
         }
-		else{
-			script_name=argv[i]; //expect any arg not -d to be script
-			script_mode=1;
-		}
+        else{
+            script_name=argv[i]; //expect any arg not -d to be script
+            script_mode=1;
+        }
     }
-	if(script_mode){
-		script_handle=open(script_name,O_RDONLY);
-		if(script_handle==-1){
-			puts("Could not open .sh file. Either permissions issue or file did not exist");
-			exit(EXIT_FAILURE);
-		}
-		else {
-			script_mode=1;
-			toRead=script_handle;
-		}
-	}
-	
+    if(script_mode){
+        script_handle=open(script_name,O_RDONLY);
+        if(script_handle==-1){
+            puts("Could not open .sh file. Either permissions issue or file did not exist");
+            exit(EXIT_FAILURE);
+        }
+        else {
+            script_mode=1;
+            toRead=script_handle;
+        }
+    }
+
 
     while (!finished) {
         char *cursor;
@@ -322,13 +323,13 @@ int main (int argc, char ** argv, char **envp) {
 
         // Print the prompt, but cwd first...
         if(!script_mode){
-			write(1,"[",1);
-			write(1,cwd,strlen(cwd));
-			write(1,"] ",2);
-			rv = write(1, prompt, strlen(prompt));
-		}
-		else rv=1;
-		
+            write(1,"[",1);
+            write(1,cwd,strlen(cwd));
+            write(1,"] ",2);
+            rv = write(1, prompt, strlen(prompt));
+        }
+        else rv=1;
+
         if (!rv) {
             finished = 1;
             break;
@@ -356,14 +357,14 @@ int main (int argc, char ** argv, char **envp) {
         // Just echo the command line for now
         if(strncmp(cmd,"\n",1)==0||strncmp(cmd,"#",1)==0)continue;	//if they just type in enter,or starts w comment
         char* comment= strchr(cmd,'#'); //find comments if any
-		if(comment){ //trim off comments
-			comment[0]='\0';
-			comment++;
-			memset(comment,0,strlen(comment));
-		}
-		if(strWhiteSpace(cmd))continue; //are we now dealing "empty" line?
-		
-		char*** commands = parsepipes(cmd);
+        if(comment){ //trim off comments
+            comment[0]='\0';
+            comment++;
+            memset(comment,0,strlen(comment));
+        }
+        if(strWhiteSpace(cmd))continue; //are we now dealing "empty" line?
+
+        char*** commands = parsepipes(cmd);
         int status = runcommands(commands);
 
     }
