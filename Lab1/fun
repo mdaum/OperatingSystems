@@ -1,0 +1,11 @@
+#!thsh
+ls
+pwd
+#cd
+cd
+pwd
+cd -
+pwd
+ls
+cat fun | less > whatever.txt
+
