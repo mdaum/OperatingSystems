@@ -24,9 +24,7 @@ char** parsecommand(char* line) { //parses a single command
     for (i = 0; cmd != NULL; i++) {
         if (!strncmp(cmd, "$", 1)) { //check if variable, replace
             argv[i] = getenv(++cmd);
-        } else {
-            argv[i] = cmd;
-        }
+        } else argv[i] = cmd;
         cmd = strtok(NULL, " \n\t");
     }
     argv[i] = NULL;
@@ -43,17 +41,15 @@ char*** parsepipes(char* line) { //parses piped commands
         cmd = strtok(NULL, "|");
     }
     lines[i] = NULL;
-    for (i = 0; lines[i] != NULL; i++) { //parse individual commands
+    for (i = 0; lines[i] != NULL; i++) //parse individual commands
         commands[i] = parsecommand(lines[i]);
-    }
     commands[i] = NULL;
     return commands;
 }
 
 int exitinternal(char** argv) { //internal exit command
-    if (!strncmp(argv[0], "exit", 4) && (strlen(argv[0]) == 4)) {
+    if (!strncmp(argv[0], "exit", 4) && (strlen(argv[0]) == 4))
         exit(EXIT_SUCCESS);
-    }
     return 1;
 }
 
@@ -143,19 +139,78 @@ int runcommands(char*** commands) { //run list of piped commands
         int filein = 0;
         //check command for redirects, set file descriptors as needed
         for (i = 0; commands[cursor][i] != NULL; ++i) {
-            if (!strncmp(commands[cursor][i], ">", 1)) {
+            if (!strncmp(commands[cursor][i], ">", 1) && strlen(commands[cursor][i]) == 1) {
+                if (debugging) {
+                    write(1, "fileout: ", strlen("fileout: "));
+                    write(1, commands[cursor][i+1], strlen(commands[cursor][i+1]));
+                    write(1, "\n", strlen("\n"));
+                }
                 fileout = open(commands[cursor][i + 1], 
                         O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP| S_IROTH);
                 commands[cursor][i] = NULL;
-            } else if (!strncmp(commands[cursor][i], "<", 1)) {
+            } else if (!strncmp(commands[cursor][i], "<", 1) && strlen(commands[cursor][i]) == 1) {
+                if (debugging) {
+                    write(1, "filein: ", strlen("filein: "));
+                    write(1, commands[cursor][i+1], strlen(commands[cursor][i+1]));
+                    write(1, "\n", strlen("\n"));
+                }
                 filein = open(commands[cursor][i + 1], O_RDONLY);
                 commands[cursor][i] = NULL;
+            } else {
+                //check for redirects without spaces
+                char* pos = strchr(commands[cursor][i], '>');
+                char* tmpfile;
+                int hasspace = 0;
+                if (pos != NULL) {
+                    tmpfile = pos + 1;
+                    if (tmpfile[0] == '\0') {//ls> file.txt 
+                        tmpfile = commands[cursor][i + 1];
+                        hasspace = 1;
+                    }
+                    if (debugging) {
+                        write(1, "fileout: ", strlen("fileout: "));
+                        write(1, tmpfile, strlen(tmpfile));
+                        write(1, "\n", strlen("\n"));
+                    }
+                    fileout = open(tmpfile, 
+                            O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP| S_IROTH);
+                    commands[cursor][i][pos - commands[cursor][i]] = '\0';
+                    if (hasspace) commands[cursor][i+1] = NULL;
+                    if (pos - commands[cursor][i] == 0) {
+                        commands[cursor][i] = NULL;
+                    } else commands[cursor][i][pos - commands[cursor][i]] = '\0';
+                } else if ((pos = strchr(commands[cursor][i], '<')) != NULL) {
+                    //puts("wat");
+                    tmpfile = pos + 1;
+                    if (tmpfile[0] == '\0') { //cat file.txt< out.txt
+                        tmpfile = commands[cursor][i + 1];
+                        hasspace = 1;
+                    }
+                    if (debugging) {
+                        write(1, "filein: ", strlen("filein: "));
+                        write(1, tmpfile, strlen(tmpfile));
+                        write(1, "\n", strlen("\n"));
+                    }
+                    filein = open(tmpfile, O_RDONLY);
+                    if (hasspace) commands[cursor][i+1] = NULL;
+                    if (pos - commands[cursor][i] == 0) {
+                        commands[cursor][i] = NULL;
+                    } else commands[cursor][i][pos - commands[cursor][i]] = '\0';
+                }
             }
         }
 
-        if (commands[1] != NULL) { //if more than one command, set up pipe
-            pipe(fd);
+        if (debugging) { //print out argv
+            write(1, "argv: ", strlen("argv: "));
+            for (i = 0; commands[cursor][i] != NULL; ++i) {
+                write(1, commands[cursor][i], strlen(commands[cursor][i]));
+                write(1, " ", strlen(" "));
+            }
+            write(1, "\n", strlen("\n"));
         }
+
+        if (commands[1] != NULL) //if more than one command, set up pipe
+            pipe(fd);
 
         if (filein < 0 || fileout < 0) {
             write(1,"Could not find file specified, or invalid args.\n",
@@ -180,9 +235,8 @@ int runcommands(char*** commands) { //run list of piped commands
                 if (fileout != 0) { //if redirecting out
                     dup2(fileout, 1); 
                     close(fileout);
-                } else if (commands[cursor + 1] != NULL) { //if next command not null
+                } else if (commands[cursor + 1] != NULL) //if next command not null
                     dup2(fd[1], 1);
-                }
                 execvp(commands[cursor][0], commands[cursor]);
                 write(1,"Could not find file specified, or invalid args.\n",
                         strlen("Could not find file specified, or invalid args.\n"));
