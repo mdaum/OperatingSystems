@@ -16,7 +16,7 @@ char lastPath[4096];
 
 char** parsecommand(char* line) {
     char** argv = malloc(MAX_INPUT / 2);
-    char* cmd = strtok(line, " \n\t()<>|&;");
+    char* cmd = strtok(line, " \n\t");
     int i;
     for (i = 0; cmd != NULL; i++) {
         if (!strncmp(cmd, "$", 1)) {
@@ -24,11 +24,29 @@ char** parsecommand(char* line) {
         } else {
             argv[i] = cmd;
         }
-        cmd = strtok(NULL, " \n\t()<>|&;");
+        cmd = strtok(NULL, " \n\t");
     }
 
     argv[i] = NULL;
     return argv;
+}
+
+char*** parsepipes(char* line) {
+    char** lines = malloc(MAX_INPUT / 2);
+    char*** commands = malloc(MAX_INPUT / 2);
+    char* cmd = strtok(line, "|");
+    int i;
+    for (i = 0; cmd != NULL; i++) {
+        lines[i] = cmd;
+        cmd = strtok(NULL, "|");
+    }
+    lines[i] = NULL;
+    for (i = 0; lines[i] != NULL; i++) {
+        commands[i] = parsecommand(lines[i]);
+    }
+    commands[i] = NULL;
+
+    return commands;
 }
 
 int exitinternal(char** argv) {
@@ -54,10 +72,11 @@ int cdinternal(char** argv) {
         if(argv[2]!=NULL){ //too many args
             write(1,"cd: Too many arguments.\n",strlen("cd: Too many arguments.\n"));
             return 0;//no more action needed...
-        } else if((argv[1]==NULL||(strncmp(argv[1],"~",1))==0)&&strlen(argv[1])==1){ //cd or cd ~
+        } else if(argv[1]==NULL||(!strncmp(argv[1],"~",1)&&strlen(argv[1])==1)){ //cd or cd ~
             cdStat=chdir(getenv("HOME"));
             if(cdStat<0){
-                write(1,"cd: failed to change to home directory.\n",strlen("cd: failed to change to home directory.\n"));
+                write(1,"cd: failed to change to home directory.\n",
+                        strlen("cd: failed to change to home directory.\n"));
                 free(argv);
                 return 0;
             }
@@ -69,18 +88,21 @@ int cdinternal(char** argv) {
             cdStat=chdir(p);
             memset(p,0,sizeof p); // because stupid strcat....
             if(cdStat<0){
-                write(1,"cd: not a valid directory.\n",strlen("cd: not a valid directory.\n"));
+                write(1,"cd: not a valid directory.\n",
+                        strlen("cd: not a valid directory.\n"));
                 free(argv);
                 return 0;
             }
             strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
         } else if((strncmp(argv[1],"-",1)==0)&&(strlen(argv[1])==1)){ //cd -
-            if(chdir(lastPath)<0)write(1,"cd: cd - failed.\n",strlen("cd: cd - failed.\n"));
+            if(chdir(lastPath)<0)write(1,"cd: cd - failed.\n",
+                    strlen("cd: cd - failed.\n"));
             strncpy(lastPath,cwd,sizeof(cwd)); //save off previous cwd...
         } else {
             cdStat=chdir(argv[1]); //normal cd
             if(cdStat<0){
-                write(1,"cd: not a valid directory.\n",strlen("cd: not a valid directory.\n"));
+                write(1,"cd: not a valid directory.\n",
+                        strlen("cd: not a valid directory.\n"));
                 return 0;
             }
         }
@@ -98,40 +120,57 @@ int runinternal(char** argv) {
     return 1;
 }
 
-int runbinary(char** argv){
-    if (!runinternal(argv)) return 0;
-
-    int pid=fork();
+int runcommands(char*** commands){
+    if (commands[1] == NULL && !runinternal(commands[0])) return 0;
+    pid_t pid;
     int child_status;
-    if(pid<0){//error forking child
-        write(1,"ERROR FORKING CHILD PROCESS\n",strlen("ERROR FORKING CHILD PROCESS\n"));
-        exit(EXIT_FAILURE);
-    }
-    else if(pid==0){//child runs execvp...dont forget to check if this fails this...
-        if (debugging) {
-            char running[MAX_INPUT + sizeof("RUNNING: \n")];
-            sprintf(running, "RUNNING: %s\n", argv[0]);
-            write(1, running, strlen(running));
+    int fd[2];
+    int in = 0;
+    int cursor;
+
+    while (commands[cursor] != NULL) {
+        if (commands[1] != NULL) {
+            pipe(fd);
         }
-        if (execvp(argv[0],argv) == -1) {
+        pid = fork();
+        if (pid < 0) {
+            write(1,"ERROR FORKING CHILD PROCESS\n",
+                    strlen("ERROR FORKING CHILD PROCESS\n"));
+            exit(EXIT_FAILURE);
+        } else if (pid == 0) {
+            if (commands[1] != NULL) dup2(in, 0);
+            if (commands[cursor + 1] != NULL) {
+                dup2(fd[1], 1);
+            }
+            if (commands[1] != NULL) close(fd[0]);
+            execvp(commands[cursor][0], commands[cursor]);
             write(1,"Could not find file specified, or invalid args.\n",
                     strlen("Could not find file specified, or invalid args.\n"));
             exit(0);
+        } else {
+            if (debugging) {
+                char running[MAX_INPUT + sizeof("RUNNING: \n")];
+                sprintf(running, "RUNNING: %s\n", commands[cursor][0]);
+                write(1, running, strlen(running));
+            }
+            waitpid(pid, &child_status, 0);
+            if (commands[1] != NULL) {
+                close(fd[1]);
+                in = fd[0];
+            }
+            char tmp[30];
+            sprintf(tmp, "%d", child_status);
+            setenv("?", tmp, 1);
+            if (debugging) {
+                char ended[MAX_INPUT + sizeof("ENDED:  (ret=)\n")];
+                sprintf(ended, "ENDED: %s (ret=%d)\n", commands[cursor][0], child_status);
+                write(1, ended, strlen(ended));
+            }
+            cursor++;
         }
     }
-    else{//parent waiting....
-        waitpid(pid, &child_status, 0);
-        char tmp[30];
-        sprintf(tmp, "%d", child_status);
-        setenv("?", tmp, 1);
-        if (debugging) {
-            char ended[MAX_INPUT + sizeof("ENDED:  (ret=)\n")];
-            sprintf(ended, "ENDED: %s (ret=%d)\n", argv[0], child_status);
-            write(1, ended, strlen(ended));
-        }
-    }
-    //set $? environment variable
-    free(argv);
+
+    free(commands);
     return 0;
 }
 
@@ -188,7 +227,8 @@ int main (int argc, char ** argv, char **envp) {
         // Execute the command, handling built-in commands separately
         // Just echo the command line for now
         if(strncmp(cmd,"\n",1)==0)continue;	//if they just type in enter
-        int status = runbinary(parsecommand(cmd)); //read status of runcommand....we can handle special commands in main space too now
+        char*** commands = parsepipes(cmd);
+        int status = runcommands(commands);
 
     }
 
