@@ -133,27 +133,18 @@ int runcommands(char*** commands){
 
     while (commands[cursor] != NULL) {
         putchar('\n');
-        int redirect = 0;
-        char* filepath;
-        int file, i, out;
+        char* fileinpath;
+        char* fileoutpath;
+        int i;
+        int fileout = 0;
+        int filein = 0;
         for (i = 0; commands[cursor][i] != NULL; ++i) {
-            if (redirect != 0) {
-                commands[cursor][i] = NULL;
-                break;
-            }
             if (!strncmp(commands[cursor][i], ">", 1)) {
-                redirect = -1;
-            } else if (!strncmp(commands[cursor][i], "<", 1)) {
-                redirect = 1;
-            }
-            if (redirect != 0) {
-                if (commands[cursor][i + 1] == NULL) {
-                    write(1,"Could not find file specified, or invalid args.\n",
-                            strlen("Could not find file specified, or invalid args.\n"));
-                    exit(0);
-                }
+                fileout = open(commands[cursor][i + 1], O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP| S_IROTH);
                 commands[cursor][i] = NULL;
-                filepath = commands[cursor][i + 1];
+            } else if (!strncmp(commands[cursor][i], "<", 1)) {
+                filein = open(commands[cursor][i + 1], O_RDONLY);
+                commands[cursor][i] = NULL;
             }
         }
 
@@ -161,12 +152,7 @@ int runcommands(char*** commands){
             pipe(fd);
         }
 
-        if (redirect == -1) {
-            fd[1] = open(filepath, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP| S_IROTH);
-        } else if (redirect == 1) {
-            in = open(filepath, O_RDONLY);
-        }
-        if (in < 0 || out < 0) {
+        if (filein < 0 || fileout < 0) {
             write(1,"Could not find file specified, or invalid args.\n",
                     strlen("Could not find file specified, or invalid args.\n"));
             exit(0);
@@ -178,12 +164,19 @@ int runcommands(char*** commands){
                     strlen("ERROR FORKING CHILD PROCESS\n"));
             exit(EXIT_FAILURE);
         } else if (pid == 0) {
-            if (redirect == 1 || commands[1] != NULL) {
+            if (filein != 0) {
+                dup2(filein, 0);
+                close(filein);
+            } else if (commands[1] != NULL) {
                 dup2(in, 0);
                 close(in);
             }
-            if (redirect == -1 || commands[cursor + 1] != NULL) dup2(fd[1], 1);
-            if (redirect == -1) close(out);
+            if (fileout != 0) {
+                dup2(fileout, 1); 
+                close(fileout);
+            } else if (commands[cursor + 1] != NULL) dup2(fd[1], 1);
+
+
             execvp(commands[cursor][0], commands[cursor]);
             write(1,"Could not find file specified, or invalid args.\n",
                     strlen("Could not find file specified, or invalid args.\n"));
