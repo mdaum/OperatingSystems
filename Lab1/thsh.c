@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
@@ -126,23 +129,63 @@ int runcommands(char*** commands){
     int child_status;
     int fd[2];
     int in = 0;
-    int cursor;
+    int out = 1;
+    int cursor = 0;
 
     while (commands[cursor] != NULL) {
-        if (commands[1] != NULL) {
+        write(1, commands[0][0], strlen(commands[0][0]));
+        putchar('\n');
+        int redirect = 0;
+        char* filepath;
+        int file;
+        for (int i = 0; commands[cursor][i] != NULL; ++i) {
+            if (redirect != 0) {
+                commands[cursor][i] = NULL;
+                break;
+            }
+            if (!strncmp(commands[cursor][i], ">", 1)) {
+                redirect = -1;
+            } else if (!strncmp(commands[cursor][i], "<", 1)) {
+                redirect = 1;
+            }
+            if (redirect != 0) {
+                if (commands[cursor][i + 1] == NULL) {
+                    write(1,"Could not find file specified, or invalid args.\n",
+                            strlen("Could not find file specified, or invalid args.\n"));
+                    exit(0);
+                }
+                commands[cursor][i] = NULL;
+                filepath = commands[cursor][i + 1];
+                write(1, filepath, strlen(filepath));
+            }
+        }
+
+        if (redirect == -1) {
+            in = open(filepath, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP| S_IROTH);
+        } else if (redirect == 1) {
+            out = open(filepath, O_RDONLY, S_IRUSR | S_IWUSR | S_IRGRP| S_IROTH);
+        }
+        if (in < 0 || out < 0) {
+            write(1,"Could not find file specified, or invalid args.\n",
+                    strlen("Could not find file specified, or invalid args.\n"));
+            exit(0);
+        }
+
+        if (redirect != 0 || commands[1] != NULL) {
             pipe(fd);
         }
+
         pid = fork();
         if (pid < 0) {
             write(1,"ERROR FORKING CHILD PROCESS\n",
                     strlen("ERROR FORKING CHILD PROCESS\n"));
             exit(EXIT_FAILURE);
         } else if (pid == 0) {
-            if (commands[1] != NULL) dup2(in, 0);
-            if (commands[cursor + 1] != NULL) {
+            if (redirect != 0 || commands[1] != NULL) dup2(in, out);
+            if (redirect != 0 || commands[cursor + 1] != NULL) {
                 dup2(fd[1], 1);
             }
-            if (commands[1] != NULL) close(fd[0]);
+            if (redirect != 0 || commands[1] != NULL) close(fd[0]);
             execvp(commands[cursor][0], commands[cursor]);
             write(1,"Could not find file specified, or invalid args.\n",
                     strlen("Could not find file specified, or invalid args.\n"));
@@ -154,7 +197,7 @@ int runcommands(char*** commands){
                 write(1, running, strlen(running));
             }
             waitpid(pid, &child_status, 0);
-            if (commands[1] != NULL) {
+            if (redirect != 0 || commands[1] != NULL) {
                 close(fd[1]);
                 in = fd[0];
             }
@@ -183,7 +226,6 @@ int main (int argc, char ** argv, char **envp) {
 
     getcwd(cwd,4096); //apparently pathMax in linux
 
-    int i;
     for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], "-d") == 0) {
             debugging = 1;
