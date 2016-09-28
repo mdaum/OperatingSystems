@@ -14,14 +14,19 @@
 #define MAX_INPUT 1024
 
 int debugging = 0;
+int time = 0;
 char cwd[4096]; //current working directory,
 char lastPath[4096]; //previous working directory
 
 char** parsecommand(char* line) { //parses a single command
     char** argv = malloc(MAX_INPUT / 2);
     char* cmd = strtok(line, " \n\t");
-    int i;
-    for (i = 0; cmd != NULL; i++) {
+    int i = 0;
+    if (time) {
+        argv[0] = strdup("time");
+        ++i;
+    }
+    for (; cmd != NULL; i++) {
         if (!strncmp(cmd, "$", 1)) { //check if variable, replace
             argv[i] = getenv(++cmd);
         } else argv[i] = cmd;
@@ -97,7 +102,7 @@ int cdinternal(char** argv) { //internal cd command
                 && (strlen(argv[1]) == 1)) { //cd -
             if (chdir(lastPath) < 0) {
                 write(1,"cd: cd - failed.\n",
-                    strlen("cd: cd - failed.\n"));
+                        strlen("cd: cd - failed.\n"));
             }
             strncpy(lastPath, cwd, sizeof(cwd)); //save off previous cwd...
         } else {
@@ -279,8 +284,10 @@ int main (int argc, char ** argv, char **envp) {
 
     int i;
     for (i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "-d") == 0) {
+        if (strncmp(argv[i], "-d", 2) == 0 && strlen(argv[i]) == 2) {
             debugging = 1;
+        } else if (strncmp(argv[i], "-t", 2) && strlen(argv[i]) == 2) {
+            time = 1;
         }
     }
 
