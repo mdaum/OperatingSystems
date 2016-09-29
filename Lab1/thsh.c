@@ -28,15 +28,18 @@ int strWhiteSpace(const char *s){
 
 char** parsecommand(char* line) { //parses a single command
     char** argv = malloc(MAX_INPUT / 2);
-    char* cmd = strtok(line, " \n\t");
+    char* cmd = strtok(line, " \n");
     int i = 0;
     for (; cmd != NULL; i++) {
         if (!strncmp(cmd, "$", 1)) { //check if variable, replace
             argv[i] = getenv(++cmd);
         } else if (cmd[0] == '~') {
             argv[i] = strcat(strdup(getenv("HOME")), &cmd[1]);
+        } else if (cmd[strlen(cmd) - 1] == '\\' ) {
+            puts("test");
+            argv[i] = strcat(cmd, strcat(strdup(" "), strtok(NULL, " \n")));
         } else argv[i] = cmd;
-        cmd = strtok(NULL, " \n\t");
+        cmd = strtok(NULL, " \n");
     }
     argv[i] = NULL;
     return argv;
@@ -56,6 +59,14 @@ char*** parsepipes(char* line) { //parses piped commands
         commands[i] = parsecommand(lines[i]);
     commands[i] = NULL;
     return commands;
+}
+
+int goheels(char** argv) {
+    if (!strncmp(argv[0], "goheels", 7) && strlen(argv[0]) == 7) {
+        char* ram = "I'm more of an ankle man\n";
+        write(1, ram, strlen(ram));
+        return 0;
+    } else return 1;
 }
 
 int exitinternal(char** argv) { //internal exit command
@@ -116,6 +127,7 @@ int runinternal(char** argv) { //check if commands are internal and run
     if (!exitinternal(argv)) return 0;
     if (!setinternal(argv)) return 0;
     if (!cdinternal(argv)) return 0;
+    if (!goheels(argv)) return 0;
     return 1;
 }
 
@@ -149,13 +161,18 @@ int runcommands(char*** commands) { //run list of piped commands
         for (i = 0; commands[cursor][i] != NULL; ++i) {
             //check for quoted string
             if (!isquotesingle) {
-                if (commands[cursor][i][0] == '"') isquotedouble = 1;
-                if (commands[cursor][i][strlen(commands[cursor][i])] == '"') isquotedouble = 0;
+                if (commands[cursor][i][0] == '"' && commands[cursor][i][1] != '\\') 
+                    isquotedouble = 1;
+                if (commands[cursor][i][strlen(commands[cursor][i])] == '"' &&
+                        commands[cursor][i][strlen(commands[cursor][i] -1)] != '\\') 
+                    isquotedouble = 0;
                 if (isquotedouble) continue;
             }
             if (!isquotedouble) {
-                if (commands[cursor][i][0] == '\'') isquotesingle = 1;
-                if (commands[cursor][i][strlen(commands[cursor][i])] == '\'') isquotesingle = 0;
+                if (commands[cursor][i][0] == '\'' && commands[cursor][i][1] != '\\') 
+                    isquotesingle = 1;
+                if (commands[cursor][i][strlen(commands[cursor][i])] == '\'' &&
+                        commands[cursor][i][strlen(commands[cursor][i] -1)] != '\\') isquotesingle = 0;
                 if (isquotesingle) continue;
             }
             //check for string of single < or >
