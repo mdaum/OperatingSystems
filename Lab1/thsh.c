@@ -141,15 +141,23 @@ int runcommands(char*** commands) { //run list of piped commands
         int i;
         int fileout = 0;
         int filein = 0;
-        int isquote = 0;
+        int isquotesingle = 0;
+        int isquotedouble = 0;
         int cmdout = 0;
         int cmdin = 1;
         //check command for redirects, set file descriptors as needed
         for (i = 0; commands[cursor][i] != NULL; ++i) {
             //check for quoted string
-            if (commands[cursor][i][0] == '"') isquote = 0;
-            if (commands[cursor][i][strlen(commands[cursor][i]-1)] == '"') isquote = 0;
-            if (isquote) continue;
+            if (!isquotesingle) {
+                if (commands[cursor][i][0] == '"') isquotedouble = 1;
+                if (commands[cursor][i][strlen(commands[cursor][i])] == '"') isquotedouble = 0;
+                if (isquotedouble) continue;
+            }
+            if (!isquotedouble) {
+                if (commands[cursor][i][0] == '\'') isquotesingle = 1;
+                if (commands[cursor][i][strlen(commands[cursor][i])] == '\'') isquotesingle = 0;
+                if (isquotesingle) continue;
+            }
             //check for string of single < or >
             if (!strncmp(commands[cursor][i], ">", 1) && strlen(commands[cursor][i]) == 1) {
                 if (debugging) debugmsg("fileout: ", commands[cursor][i+1]);
