@@ -138,7 +138,9 @@ int debugmsg(char* message, char* string) {
 }
 
 int runcommands(char*** commands) { //run list of piped commands
+    if (commands[0][0] == NULL) return 1;
     if (commands[1] == NULL && !runinternal(commands[0])) {
+        setenv("?", "0", 1); //set $? environment variable
         return 0; //if internal command was executed
     }
     pid_t pid;
