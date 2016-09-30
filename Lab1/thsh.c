@@ -9,7 +9,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <ctype.h>
 
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
@@ -17,29 +16,105 @@
 int debugging = 0;
 char cwd[4096]; //current working directory,
 char lastPath[4096]; //previous working directory
+int currJobs=0; // when inserting, assign ++currJobs....curJobs-- when popping...
+
+
+
+struct Job{ //will add in char** later....some tricky mem managment I believe due to dynamic size
+	int pid;
+	int retStatus;
+	char * fileName;
+	char * args;
+	int jobNum;
+	struct Job *next;
+};
+
+struct Job *head = NULL;//list initially empty
+
+void push(int pid,char *fName, char*args){
+	struct Job *temp=malloc(sizeof(struct Job));
+	temp->pid=pid;
+	temp->retStatus=1;
+	temp->fileName=fName;
+	temp->args=args;
+	temp->jobNum=++currJobs;
+	temp->next=head;
+	head=temp;
+}
+
+void print_job(struct Job *j){
+	char* status;
+		if(!j->retStatus)status="DONE\0";
+		else status="IN PROGRESS\0";
+		fprintf(stdout,"[%d]\t%s\t%s",j->jobNum,status,j->fileName);
+		if(j->args!=NULL)fprintf(stdout," %s",j->args);
+/* 		if(j->next!=NULL)fprintf(stdout,"\tmy next is %d",j->next->pid);
+		else fprintf(stdout,"\tmy next is NULL"); */
+		fprintf(stdout,"\n");
+}
+
+void print_job_list(){
+	struct Job * curr = head;
+	while(curr!=NULL){
+		print_job(curr);
+		curr=curr->next;
+	}
+}
+
+struct Job* find(int pid){
+	struct Job *curr=head;
+	while(curr!=NULL){
+		if(curr->pid==pid)return curr;
+		curr=curr->next;
+	}
+	fprintf(stdout,"WHAT? How did you try to find a non-existent job?");
+	return NULL; //shouldn't happen
+}
+
+struct Job* findBefore(int pid){ //finds just before pid, wont call if pid is head
+	struct Job *curr=head;
+	while(curr!=NULL){
+		if(curr->next->pid==pid)return curr;
+		curr=curr->next;
+	}
+	return NULL;//shouldn't happen
+}
+
+void removeJob(int pid){ //could reduce lines
+	struct Job *toRemove=find(pid);
+	currJobs--;
+	if(toRemove==head){
+		head=toRemove->next;
+		toRemove->retStatus=0;
+		print_job(toRemove);
+		free(toRemove);
+		return;
+	}
+	struct Job *Before=findBefore(pid);
+	Before->next=toRemove->next;
+	toRemove->retStatus=0;
+	print_job(toRemove);
+	free(toRemove);
+	return;	
+}
 
 int strWhiteSpace(const char *s){
-    while(*s!='\0'){
-        if(!isspace(*s))return 0;
-        s++;
-    }
-    return 1;
+	while(*s!='\0'){
+		if(!isspace(*s))return 0;
+		s++;
+	}
+	return 1;
 }
 
 char** parsecommand(char* line) { //parses a single command
     char** argv = malloc(MAX_INPUT / 2);
-    char* cmd = strtok(line, " \n");
+    char* cmd = strtok(line, " \n\t");
     int i = 0;
     for (; cmd != NULL; i++) {
         if (!strncmp(cmd, "$", 1)) { //check if variable, replace
             argv[i] = getenv(++cmd);
-        } else if (cmd[0] == '~') {
-            argv[i] = strcat(strdup(getenv("HOME")), &cmd[1]);
-        } else if (cmd[strlen(cmd) - 1] == '\\' ) {
-            puts("test");
-            argv[i] = strcat(cmd, strcat(strdup(" "), strtok(NULL, " \n")));
         } else argv[i] = cmd;
-        cmd = strtok(NULL, " \n");
+        cmd = strtok(NULL, " \n\t");
     }
     argv[i] = NULL;
     return argv;
@@ -59,14 +134,6 @@ char*** parsepipes(char* line) { //parses piped commands
         commands[i] = parsecommand(lines[i]);
     commands[i] = NULL;
     return commands;
-}
-
-int goheels(char** argv) {
-    if (!strncmp(argv[0], "goheels", 7) && strlen(argv[0]) == 7) {
-        char* ram = "I'm more of an ankle man\n";
-        write(1, ram, strlen(ram));
-        return 0;
-    } else return 1;
 }
 
 int exitinternal(char** argv) { //internal exit command
@@ -92,11 +159,25 @@ int cdinternal(char** argv) { //internal cd command
             write(1, "cd: Too many arguments.\n",
                     strlen("cd: Too many arguments.\n"));
             return 0;//no more action needed...
-        } else if (argv[1] == NULL) {
+        } else if (argv[1] == NULL || (!strncmp(argv[1],"~",1) 
+                    && strlen(argv[1]) == 1)) { //cd or cd ~
             cdStat = chdir(getenv("HOME"));
             if (cdStat < 0){
                 write(1, "cd: failed to change to home directory.\n",
                         strlen("cd: failed to change to home directory.\n"));
+                free(argv);
+                return 0;
+            }
+            strncpy(lastPath, cwd, sizeof(cwd)); //save off previous cwd...
+        } else if ((strncmp(argv[1], "~", 1) == 0)) { //cd ~X
+            char p[4096]; 
+            strcat(p, getenv("HOME"));
+            strcat(p, argv[1] + sizeof(char));//append all but ~ to home path...
+            cdStat = chdir(p);
+            memset(p, 0, sizeof p); // because stupid strcat....
+            if (cdStat < 0) {
+                write(1, "cd: not a valid directory.\n",
+                        strlen("cd: not a valid directory.\n"));
                 free(argv);
                 return 0;
             }
@@ -115,7 +196,7 @@ int cdinternal(char** argv) { //internal cd command
                         strlen("cd: not a valid directory.\n"));
                 return 0;
             }
-            strncpy(lastPath, cwd, sizeof(cwd)); //save off previous cwd...
+			strncpy(lastPath, cwd, sizeof(cwd)); //save off previous cwd...
         }
         getcwd(cwd,4096); //update cwd...
         return 0;
@@ -127,20 +208,11 @@ int runinternal(char** argv) { //check if commands are internal and run
     if (!exitinternal(argv)) return 0;
     if (!setinternal(argv)) return 0;
     if (!cdinternal(argv)) return 0;
-    if (!goheels(argv)) return 0;
     return 1;
 }
 
-int debugmsg(char* message, char* string) {
-    write(1, message, strlen(message));
-    write(1, string, strlen(string));
-    write(1, "\n", strlen("\n"));
-}
-
 int runcommands(char*** commands) { //run list of piped commands
-    if (commands[0][0] == NULL) return 1;
     if (commands[1] == NULL && !runinternal(commands[0])) {
-        setenv("?", "0", 1); //set $? environment variable
         return 0; //if internal command was executed
     }
     pid_t pid;
@@ -155,36 +227,23 @@ int runcommands(char*** commands) { //run list of piped commands
         int i;
         int fileout = 0;
         int filein = 0;
-        int isquotesingle = 0;
-        int isquotedouble = 0;
-        int cmdout = 0;
-        int cmdin = 1;
         //check command for redirects, set file descriptors as needed
         for (i = 0; commands[cursor][i] != NULL; ++i) {
-            //check for quoted string
-            if (!isquotesingle) {
-                if (commands[cursor][i][0] == '"' && commands[cursor][i][1] != '\\') 
-                    isquotedouble = 1;
-                if (commands[cursor][i][strlen(commands[cursor][i])] == '"' &&
-                        commands[cursor][i][strlen(commands[cursor][i] -1)] != '\\') 
-                    isquotedouble = 0;
-                if (isquotedouble) continue;
-            }
-            if (!isquotedouble) {
-                if (commands[cursor][i][0] == '\'' && commands[cursor][i][1] != '\\') 
-                    isquotesingle = 1;
-                if (commands[cursor][i][strlen(commands[cursor][i])] == '\'' &&
-                        commands[cursor][i][strlen(commands[cursor][i] -1)] != '\\') isquotesingle = 0;
-                if (isquotesingle) continue;
-            }
-            //check for string of single < or >
             if (!strncmp(commands[cursor][i], ">", 1) && strlen(commands[cursor][i]) == 1) {
-                if (debugging) debugmsg("fileout: ", commands[cursor][i+1]);
+                if (debugging) {
+                    write(1, "fileout: ", strlen("fileout: "));
+                    write(1, commands[cursor][i+1], strlen(commands[cursor][i+1]));
+                    write(1, "\n", strlen("\n"));
+                }
                 fileout = open(commands[cursor][i + 1], 
                         O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP| S_IROTH);
                 commands[cursor][i] = NULL;
             } else if (!strncmp(commands[cursor][i], "<", 1) && strlen(commands[cursor][i]) == 1) {
-                if (debugging) debugmsg("filein: ", commands[cursor][i+1]);
+                if (debugging) {
+                    write(1, "filein: ", strlen("filein: "));
+                    write(1, commands[cursor][i+1], strlen(commands[cursor][i+1]));
+                    write(1, "\n", strlen("\n"));
+                }
                 filein = open(commands[cursor][i + 1], O_RDONLY);
                 commands[cursor][i] = NULL;
             } else {
@@ -193,37 +252,38 @@ int runcommands(char*** commands) { //run list of piped commands
                 char* tmpfile;
                 int hasspace = 0;
                 if (pos != NULL) {
-                    if (pos - commands[cursor][i] != 0) {
-                        int tmpin = (int)strtol(commands[cursor][i], &pos, 10);
-                        if (tmpin > 0) cmdin = tmpin;
-                    }
                     tmpfile = pos + 1;
                     if (tmpfile[0] == '\0') {//ls> file.txt 
                         tmpfile = commands[cursor][i + 1];
                         hasspace = 1;
                     }
-                    if (debugging) debugmsg("fileout: ", tmpfile);
+                    if (debugging) {
+                        write(1, "fileout: ", strlen("fileout: "));
+                        write(1, tmpfile, strlen(tmpfile));
+                        write(1, "\n", strlen("\n"));
+                    }
                     fileout = open(tmpfile, 
                             O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP| S_IROTH);
                     commands[cursor][i][pos - commands[cursor][i]] = '\0';
                     if (hasspace) commands[cursor][i+1] = NULL;
-                    if (pos - commands[cursor][i] == 0 || cmdin > 0) {
+                    if (pos - commands[cursor][i] == 0) {
                         commands[cursor][i] = NULL;
                     } else commands[cursor][i][pos - commands[cursor][i]] = '\0';
                 } else if ((pos = strchr(commands[cursor][i], '<')) != NULL) {
-                    if (pos - commands[cursor][i] != 0) {
-                        int tmpout = (int)strtol(commands[cursor][i], &pos, 10);
-                        if (tmpout > 0) cmdout = tmpout;
-                    }
+                    //puts("wat");
                     tmpfile = pos + 1;
                     if (tmpfile[0] == '\0') { //cat file.txt< out.txt
                         tmpfile = commands[cursor][i + 1];
                         hasspace = 1;
                     }
-                    if (debugging) debugmsg("filein: ", tmpfile);
+                    if (debugging) {
+                        write(1, "filein: ", strlen("filein: "));
+                        write(1, tmpfile, strlen(tmpfile));
+                        write(1, "\n", strlen("\n"));
+                    }
                     filein = open(tmpfile, O_RDONLY);
                     if (hasspace) commands[cursor][i+1] = NULL;
-                    if (pos - commands[cursor][i] == 0 || cmdout > 0) {
+                    if (pos - commands[cursor][i] == 0) {
                         commands[cursor][i] = NULL;
                     } else commands[cursor][i][pos - commands[cursor][i]] = '\0';
                 }
@@ -256,14 +316,14 @@ int runcommands(char*** commands) { //run list of piped commands
                 exit(EXIT_FAILURE);
             case 0:
                 if (filein != 0) { //if redirecting in
-                    dup2(filein, cmdout);
+                    dup2(filein, 0);
                     close(filein);
                 } else if (commands[1] != NULL) { //if more than one command
                     dup2(in, 0);
                     close(in);
                 }
                 if (fileout != 0) { //if redirecting out
-                    dup2(fileout, cmdin); 
+                    dup2(fileout, 1); 
                     close(fileout);
                 } else if (commands[cursor + 1] != NULL) //if next command not null
                     dup2(fd[1], 1);
@@ -300,38 +360,70 @@ int runcommands(char*** commands) { //run list of piped commands
 
 
 int main (int argc, char ** argv, char **envp) {
-    char* script_name;
-    int script_handle;
-    int script_mode=0;
-    int toRead=0; //either stdin or handle for script
+	char* script_name;
+	int script_handle;
+	int script_mode=0;
+	int toRead=0; //either stdin or handle for script
     int finished = 0;
     char *prompt = "thsh> ";
     char cmd[MAX_INPUT];
 
     getcwd(cwd,4096); //apparently pathMax in linux
-
+	
+	//begin testing linked list
+	push(1111,"file1 weoifjowefij","args ggggggg");
+	push(1112,"file2 wewfeeeeeeeeeeeeeij","args gggggaaaaaaaff");
+	push(1113,"file3","args");
+	push(1114,"file4","args");
+	push(1115,"file5","args");
+	print_job_list();
+	puts("\n");
+	removeJob(1111);
+	print_job_list();
+	puts("\n");
+ 	removeJob(1113);
+	print_job_list();
+	puts("\n");
+	removeJob(1115);
+	print_job_list();
+	puts("\n");
+	removeJob(1114);
+	print_job_list();
+	puts("\n");
+	removeJob(1112);
+	print_job_list();
+	puts("\n");
+	push(1112,"file2 wewfeeeeeeeeeeeeeij","args gggggaaaaaaaff");
+	push(1113,"file3","args");
+	print_job_list();
+	puts("\n");	
+	removeJob(1113);
+	print_job_list();
+	exit(EXIT_SUCCESS); //testing linked list for now...
+	//end testing linked list...
+	
     int i;
     for (i = 1; i < argc; i++) {
         if (strncmp(argv[i], "-d", 2) == 0 && strlen(argv[i]) == 2) {
             debugging = 1;
         }
-        else{
-            script_name=argv[i]; //expect any arg not -d to be script
-            script_mode=1;
-        }
+		else{
+			script_name=argv[i]; //expect any arg not -d to be script
+			script_mode=1;
+		}
     }
-    if(script_mode){
-        script_handle=open(script_name,O_RDONLY);
-        if(script_handle==-1){
-            puts("Could not open .sh file. Either permissions issue or file did not exist");
-            exit(EXIT_FAILURE);
-        }
-        else {
-            script_mode=1;
-            toRead=script_handle;
-        }
-    }
-
+	if(script_mode){
+		script_handle=open(script_name,O_RDONLY);
+		if(script_handle==-1){
+			puts("Could not open .sh file. Either permissions issue or file did not exist");
+			exit(EXIT_FAILURE);
+		}
+		else {
+			script_mode=1;
+			toRead=script_handle;
+		}
+	}
+	
 
     while (!finished) {
         char *cursor;
@@ -341,13 +433,13 @@ int main (int argc, char ** argv, char **envp) {
 
         // Print the prompt, but cwd first...
         if(!script_mode){
-            write(1,"[",1);
-            write(1,cwd,strlen(cwd));
-            write(1,"] ",2);
-            rv = write(1, prompt, strlen(prompt));
-        }
-        else rv=1;
-
+			write(1,"[",1);
+			write(1,cwd,strlen(cwd));
+			write(1,"] ",2);
+			rv = write(1, prompt, strlen(prompt));
+		}
+		else rv=1;
+		
         if (!rv) {
             finished = 1;
             break;
@@ -375,14 +467,14 @@ int main (int argc, char ** argv, char **envp) {
         // Just echo the command line for now
         if(strncmp(cmd,"\n",1)==0||strncmp(cmd,"#",1)==0)continue;	//if they just type in enter,or starts w comment
         char* comment= strchr(cmd,'#'); //find comments if any
-        if(comment){ //trim off comments
-            comment[0]='\0';
-            comment++;
-            memset(comment,0,strlen(comment));
-        }
-        if(strWhiteSpace(cmd))continue; //are we now dealing "empty" line?
-
-        char*** commands = parsepipes(cmd);
+		if(comment){ //trim off comments
+			comment[0]='\0';
+			comment++;
+			memset(comment,0,strlen(comment));
+		}
+		if(strWhiteSpace(cmd))continue; //are we now dealing "empty" line?
+		
+		char*** commands = parsepipes(cmd);
         int status = runcommands(commands);
 
     }
