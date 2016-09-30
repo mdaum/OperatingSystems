@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
@@ -18,92 +19,100 @@ char cwd[4096]; //current working directory,
 char lastPath[4096]; //previous working directory
 int currJobs=0; // when inserting, assign ++currJobs....curJobs-- when popping...
 
-
-
 struct Job{ //will add in char** later....some tricky mem managment I believe due to dynamic size
-	int pid;
-	int retStatus;
-	char * fileName;
-	char * args;
-	int jobNum;
-	struct Job *next;
+    int pid;
+    int retStatus;
+    char * fileName;
+    char * args;
+    int jobNum;
+    struct Job *next;
 };
 
 struct Job *head = NULL;//list initially empty
 
 void push(int pid,char *fName, char*args){
-	struct Job *temp=malloc(sizeof(struct Job));
-	temp->pid=pid;
-	temp->retStatus=1;
-	temp->fileName=fName;
-	temp->args=args;
-	temp->jobNum=++currJobs;
-	temp->next=head;
-	head=temp;
+    struct Job *temp=malloc(sizeof(struct Job));
+    temp->pid=pid;
+    temp->retStatus=1;
+    temp->fileName=fName;
+    temp->args=args;
+    temp->jobNum=++currJobs;
+    temp->next=head;
+    head=temp;
 }
 
 void print_job(struct Job *j){
-	char* status;
-		if(!j->retStatus)status="DONE\0";
-		else status="IN PROGRESS\0";
-		fprintf(stdout,"[%d]\t%s\t%s",j->jobNum,status,j->fileName);
-		if(j->args!=NULL)fprintf(stdout," %s",j->args);
-/* 		if(j->next!=NULL)fprintf(stdout,"\tmy next is %d",j->next->pid);
-		else fprintf(stdout,"\tmy next is NULL"); */
-		fprintf(stdout,"\n");
+    char* status;
+    if(!j->retStatus)status="DONE\0";
+    else status="IN PROGRESS\0";
+    fprintf(stdout,"[%d]\t%s\t%s",j->jobNum,status,j->fileName);
+    if(j->args!=NULL)fprintf(stdout," %s",j->args);
+    /* 		if(j->next!=NULL)fprintf(stdout,"\tmy next is %d",j->next->pid);
+                else fprintf(stdout,"\tmy next is NULL"); */
+    fprintf(stdout,"\n");
 }
 
 void print_job_list(){
-	struct Job * curr = head;
-	while(curr!=NULL){
-		print_job(curr);
-		curr=curr->next;
-	}
+    struct Job * curr = head;
+    while(curr!=NULL){
+        print_job(curr);
+        curr=curr->next;
+    }
 }
 
 struct Job* find(int pid){
-	struct Job *curr=head;
-	while(curr!=NULL){
-		if(curr->pid==pid)return curr;
-		curr=curr->next;
-	}
-	fprintf(stdout,"WHAT? How did you try to find a non-existent job?");
-	return NULL; //shouldn't happen
+    struct Job *curr=head;
+    while(curr!=NULL){
+        if(curr->pid==pid)return curr;
+        curr=curr->next;
+    }
+    fprintf(stdout,"WHAT? How did you try to find a non-existent job?");
+    return NULL; //shouldn't happen
+}
+
+struct Job* findjob(int jobNum){
+    struct Job *curr=head;
+    while(curr!=NULL){
+        if(curr->jobNum==jobNum)return curr;
+        curr=curr->next;
+    }
+    fprintf(stdout,"WHAT? How did you try to find a non-existent job?");
+    return NULL; //shouldn't happen
 }
 
 struct Job* findBefore(int pid){ //finds just before pid, wont call if pid is head
-	struct Job *curr=head;
-	while(curr!=NULL){
-		if(curr->next->pid==pid)return curr;
-		curr=curr->next;
-	}
-	return NULL;//shouldn't happen
+    struct Job *curr=head;
+    while(curr!=NULL){
+        if(curr->next->pid==pid)return curr;
+        curr=curr->next;
+    }
+    return NULL;//shouldn't happen
 }
 
-void removeJob(int pid){ //could reduce lines
-	struct Job *toRemove=find(pid);
-	currJobs--;
-	if(toRemove==head){
-		head=toRemove->next;
-		toRemove->retStatus=0;
-		print_job(toRemove);
-		free(toRemove);
-		return;
-	}
-	struct Job *Before=findBefore(pid);
-	Before->next=toRemove->next;
-	toRemove->retStatus=0;
-	print_job(toRemove);
-	free(toRemove);
-	return;	
+void removejob(int pid){ //could reduce lines
+    struct Job *toRemove=find(pid);
+    currJobs--;
+    if(toRemove==head){
+        head=toRemove->next;
+        toRemove->retStatus=0;
+        print_job(toRemove);
+        free(toRemove);
+        return;
+    }
+    struct Job *Before=findBefore(pid);
+    Before->next=toRemove->next;
+    toRemove->retStatus=0;
+    print_job(toRemove);
+    free(toRemove);
+    return;	
 }
 
 int strWhiteSpace(const char *s){
-	while(*s!='\0'){
-		if(!isspace(*s))return 0;
-		s++;
-	}
-	return 1;
+    while(*s!='\0'){
+        if(!isspace(*s))return 0;
+        s++;
+    }
+    return 1;
 }
 
 char** parsecommand(char* line) { //parses a single command
@@ -196,7 +205,7 @@ int cdinternal(char** argv) { //internal cd command
                         strlen("cd: not a valid directory.\n"));
                 return 0;
             }
-			strncpy(lastPath, cwd, sizeof(cwd)); //save off previous cwd...
+            strncpy(lastPath, cwd, sizeof(cwd)); //save off previous cwd...
         }
         getcwd(cwd,4096); //update cwd...
         return 0;
@@ -360,86 +369,95 @@ int runcommands(char*** commands) { //run list of piped commands
 
 
 int main (int argc, char ** argv, char **envp) {
-	char* script_name;
-	int script_handle;
-	int script_mode=0;
-	int toRead=0; //either stdin or handle for script
+    char* script_name;
+    int script_handle;
+    int script_mode=0;
+    int toRead=0; //either stdin or handle for script
     int finished = 0;
     char *prompt = "thsh> ";
     char cmd[MAX_INPUT];
 
     getcwd(cwd,4096); //apparently pathMax in linux
-	
-	//begin testing linked list
-	push(1111,"file1 weoifjowefij","args ggggggg");
-	push(1112,"file2 wewfeeeeeeeeeeeeeij","args gggggaaaaaaaff");
-	push(1113,"file3","args");
-	push(1114,"file4","args");
-	push(1115,"file5","args");
-	print_job_list();
-	puts("\n");
-	removeJob(1111);
-	print_job_list();
-	puts("\n");
- 	removeJob(1113);
-	print_job_list();
-	puts("\n");
-	removeJob(1115);
-	print_job_list();
-	puts("\n");
-	removeJob(1114);
-	print_job_list();
-	puts("\n");
-	removeJob(1112);
-	print_job_list();
-	puts("\n");
-	push(1112,"file2 wewfeeeeeeeeeeeeeij","args gggggaaaaaaaff");
-	push(1113,"file3","args");
-	print_job_list();
-	puts("\n");	
-	removeJob(1113);
-	print_job_list();
-	exit(EXIT_SUCCESS); //testing linked list for now...
-	//end testing linked list...
-	
+
+    //begin testing linked list
+    push(1111,"file1 weoifjowefij","args ggggggg");
+    push(1112,"file2 wewfeeeeeeeeeeeeeij","args gggggaaaaaaaff");
+    push(1113,"file3","args");
+    push(1114,"file4","args");
+    push(1115,"file5","args");
+    print_job_list();
+    puts("\n");
+    removejob(1111);
+    print_job_list();
+    puts("\n");
+    removejob(1113);
+    print_job_list();
+    puts("\n");
+    removejob(1115);
+    print_job_list();
+    puts("\n");
+    removejob(1114);
+    print_job_list();
+    puts("\n");
+    removejob(1112);
+    print_job_list();
+    puts("\n");
+    push(1112,"file2 wewfeeeeeeeeeeeeeij","args gggggaaaaaaaff");
+    push(1113,"file3","args");
+    print_job_list();
+    puts("\n");	
+    removejob(1113);
+    print_job_list();
+    exit(EXIT_SUCCESS); //testing linked list for now...
+    //end testing linked list...
+
     int i;
     for (i = 1; i < argc; i++) {
         if (strncmp(argv[i], "-d", 2) == 0 && strlen(argv[i]) == 2) {
             debugging = 1;
         }
-		else{
-			script_name=argv[i]; //expect any arg not -d to be script
-			script_mode=1;
-		}
+        else{
+            script_name=argv[i]; //expect any arg not -d to be script
+            script_mode=1;
+        }
     }
-	if(script_mode){
-		script_handle=open(script_name,O_RDONLY);
-		if(script_handle==-1){
-			puts("Could not open .sh file. Either permissions issue or file did not exist");
-			exit(EXIT_FAILURE);
-		}
-		else {
-			script_mode=1;
-			toRead=script_handle;
-		}
-	}
-	
+    if(script_mode){
+        script_handle=open(script_name,O_RDONLY);
+        if(script_handle==-1){
+            puts("Could not open .sh file. Either permissions issue or file did not exist");
+            exit(EXIT_FAILURE);
+        }
+        else {
+            script_mode=1;
+            toRead=script_handle;
+        }
+    }
+
 
     while (!finished) {
         char *cursor;
         char last_char;
         int rv;
         int count;
+        int jobrv;
+        int pid;
+        struct Job* job = head;
+
+        while (job != NULL) { //ALSO DO BEFORE RETURNING FROM MAIN
+            if (pid = waitpid(job->pid, &jobrv, WNOHANG)) removejob(job->pid);
+            else if (pid < 0); //HANDLE EXIT CONDITION
+            job = job->next;
+        }
 
         // Print the prompt, but cwd first...
         if(!script_mode){
-			write(1,"[",1);
-			write(1,cwd,strlen(cwd));
-			write(1,"] ",2);
-			rv = write(1, prompt, strlen(prompt));
-		}
-		else rv=1;
-		
+            write(1,"[",1);
+            write(1,cwd,strlen(cwd));
+            write(1,"] ",2);
+            rv = write(1, prompt, strlen(prompt));
+        }
+        else rv=1;
+
         if (!rv) {
             finished = 1;
             break;
@@ -467,14 +485,14 @@ int main (int argc, char ** argv, char **envp) {
         // Just echo the command line for now
         if(strncmp(cmd,"\n",1)==0||strncmp(cmd,"#",1)==0)continue;	//if they just type in enter,or starts w comment
         char* comment= strchr(cmd,'#'); //find comments if any
-		if(comment){ //trim off comments
-			comment[0]='\0';
-			comment++;
-			memset(comment,0,strlen(comment));
-		}
-		if(strWhiteSpace(cmd))continue; //are we now dealing "empty" line?
-		
-		char*** commands = parsepipes(cmd);
+        if(comment){ //trim off comments
+            comment[0]='\0';
+            comment++;
+            memset(comment,0,strlen(comment));
+        }
+        if(strWhiteSpace(cmd))continue; //are we now dealing "empty" line?
+
+        char*** commands = parsepipes(cmd);
         int status = runcommands(commands);
 
     }
