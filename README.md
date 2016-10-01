@@ -24,5 +24,5 @@ Written by Max Daum and James Barbour
 
 ### Job Control ###
 *Used a linked list of structs representing jobs.
-*If job being run in background we do a preliminary fork in runcommands in order to have a parent of all potential execvp calls made in job.
+*If job being run in background we do a preliminary fork in runcommands in order to have a parent of all potential execvp calls made in job, and to use our same runcommands code again with minimal additions.
 *Used a currpid global var to avoid suspending or terminating shell, and to also determine whether user owns foreground or not
