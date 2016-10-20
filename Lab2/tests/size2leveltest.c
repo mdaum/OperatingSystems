@@ -2,7 +2,19 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
-#include "../th_alloc.c"
+
+static inline int size2level (ssize_t size) {
+  /* Your code here.
+   *    * Convert the size to the correct power of two. 
+   *       * Recall that the 0th entry in levels is really 2^5, 
+   *          * the second level represents 2^6, etc.
+   *             */
+  if (size <= 32) return 0;
+  int i = -5;
+  if (size % 2 != 0) ++i;
+  while(size >>= 1) ++i; 
+  return i;
+}
 
 int main(){
   int zero0=size2level(30);
