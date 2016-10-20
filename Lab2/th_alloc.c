@@ -110,7 +110,7 @@ struct superblock_bookkeeping * alloc_super (int power) {
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
    free_objects=4096 >> (power+5);
-  page->bkeep->free_objects=free_objects;
+  sb->bkeep.free_count=free_objects;
   levels[power].free_objects+=free_objects;
   bytes_per_object=2 << (power+5);
   // The following loop populates the free list with some atrocious
