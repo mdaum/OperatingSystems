@@ -81,7 +81,7 @@ static inline int size2level (ssize_t size) {
    */
   if (size <= 32) return 0;
   int i = -5;
-  if (i % 2 != 0) ++i;
+  if (size % 2 != 0) ++i;
   while(size >>= 1) ++i;
   return i;
 }
@@ -96,7 +96,8 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here  
   // Allocate a page of anonymous memory
   // WARNING: DO NOT use brk---use mmap, lest you face untold suffering
-  page = mmap(NULL, SUPER_BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+  
+  page = mmap(NULL, SUPER_BLOCK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
   sb = (struct superblock*) page;
   // Put this one the list.
@@ -113,6 +114,8 @@ struct superblock_bookkeeping * alloc_super (int power) {
   sb->bkeep.free_count = free_objects;
   levels[power].free_objects += free_objects;
   bytes_per_object = 2 << (power+5);
+
+
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
   // correctly calculate free_objects.
@@ -127,7 +130,7 @@ struct superblock_bookkeeping * alloc_super (int power) {
   return &sb->bkeep;
 }
 
-void *malloc(size_t size) {
+void *malloc_internal(size_t size) {
   struct superblock_pool *pool;
   struct superblock_bookkeeping *bkeep;
   void *rv = NULL;
