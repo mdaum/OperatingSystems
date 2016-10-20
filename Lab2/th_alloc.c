@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <sys/mman.h>
 
 #define assert(cond) if (!(cond)) __asm__ __volatile__ ("int $3")
 
@@ -80,11 +81,9 @@ static inline int size2level (ssize_t size) {
    */
   if (size <= 32) return 0;
   int i = -5;
-  while((size=size << 1)){
-	  ++i; 
-	  printf("size is %d, i is %d\n",size,i);
-  } 
-  return size % 2 == 0 ? i : ++i;
+  if (i % 2 != 0) ++i;
+  while((size=size << 1)) ++i;
+  return i;
 }
 
 static inline
@@ -97,6 +96,7 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here  
   // Allocate a page of anonymous memory
   // WARNING: DO NOT use brk---use mmap, lest you face untold suffering
+  page = mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_ANONYMOUS, -1, 0);
 
   sb = (struct superblock*) page;
   // Put this one the list.
