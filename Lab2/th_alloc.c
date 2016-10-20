@@ -109,11 +109,13 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here: Calculate and fill the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
-
+   free_objects=4096 >> (power+5);
+  page->bkeep->free_objects=free_objects;
+  levels[power].free_objects+=free_objects;
+  bytes_per_object=2 << (power+5);
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
   // correctly calculate free_objects.
-
   cursor = (char *) sb;
   // skip the first object
   for (cursor += bytes_per_object; free_objects--; cursor += bytes_per_object) {
