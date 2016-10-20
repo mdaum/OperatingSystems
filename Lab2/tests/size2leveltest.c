@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include "../th_alloc.c"
 
-static inline 
 int main(){
   int zero0=size2level(30);
   int zero1=size2level(32);
