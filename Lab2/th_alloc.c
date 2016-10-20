@@ -80,7 +80,10 @@ static inline int size2level (ssize_t size) {
    */
   if (size <= 32) return 0;
   int i = -5;
-  while (size << 1) ++i;
+  while((size=size << 1)){
+	  ++i; 
+	  printf("size is %d, i is %d\n",size,i);
+  } 
   return size % 2 == 0 ? i : ++i;
 }
 
