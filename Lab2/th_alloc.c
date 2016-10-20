@@ -78,7 +78,8 @@ static inline int size2level (ssize_t size) {
    * Recall that the 0th entry in levels is really 2^5, 
    * the second level represents 2^6, etc.
    */
-  int i = 0;
+  if (size <= 32) return 0;
+  int i = -5;
   while (size << 1) ++i;
   return size % 2 == 0 ? i : ++i;
 }
