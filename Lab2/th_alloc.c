@@ -96,7 +96,7 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here  
   // Allocate a page of anonymous memory
   // WARNING: DO NOT use brk---use mmap, lest you face untold suffering
-  page = mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+  page = mmap(NULL, SUPER_BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_ANONYMOUS, -1, 0);
 
   sb = (struct superblock*) page;
   // Put this one the list.
@@ -109,10 +109,10 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here: Calculate and fill the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
-  free_objects=4096 >> (power+5);
-  sb->bkeep.free_count=free_objects;
-  levels[power].free_objects+=free_objects;
-  bytes_per_object=2 << (power+5);
+  free_objects = (SUPER_BLOCK_SIZE >> (power+5)) - 1;
+  sb->bkeep.free_count = free_objects;
+  levels[power].free_objects += free_objects;
+  bytes_per_object = 2 << (power+5);
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
   // correctly calculate free_objects.
@@ -155,7 +155,7 @@ void *malloc(size_t size) {
       //     superblock, decrement levels[power]->whole_superblocks
       bkeep->free_list = next->next;
       rv = next;
-      if ((4096 >> (power+5)) == bkeep->free_count) --pool->whole_superblocks;
+      if ((SUPER_BLOCK_SIZE >> (power+5)) == bkeep->free_count) --pool->whole_superblocks;
       --pool->free_objects;
       --bkeep->free_count;
       break;
