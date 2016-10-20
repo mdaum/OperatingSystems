@@ -109,7 +109,7 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here: Calculate and fill the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
-   free_objects=4096 >> (power+5);
+  free_objects=4096 >> (power+5);
   sb->bkeep.free_count=free_objects;
   levels[power].free_objects+=free_objects;
   bytes_per_object=2 << (power+5);
@@ -139,17 +139,11 @@ void *malloc(size_t size) {
     return NULL;
   }
 
-  // Delete the following two lines
-  errno = -ENOMEM;
-  return rv;
-
-
   pool = &levels[power];
 
   if (!pool->free_objects) {
     bkeep = alloc_super(power);
-  } else
-    bkeep = pool->next;
+  } else bkeep = pool->next;
 
   while (bkeep != NULL) {
     if (bkeep->free_count) {
@@ -159,8 +153,14 @@ void *malloc(size_t size) {
       //
       // NB: If you take the first object out of a whole
       //     superblock, decrement levels[power]->whole_superblocks
+      bkeep->free_list = next->next;
+      rv = next;
+      if ((4096 >> (power+5)) == bkeep->free_count) --pool->whole_superblocks;
+      --pool->free_objects;
+      --bkeep->free_count;
       break;
     }
+    bkeep = bkeep->next;
   }
 
   // assert that rv doesn't end up being NULL at this point
