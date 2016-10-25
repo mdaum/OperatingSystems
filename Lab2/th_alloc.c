@@ -130,7 +130,7 @@ struct superblock_bookkeeping * alloc_super (int power) {
   return &sb->bkeep;
 }
 
-void *malloc_internal(size_t size) {
+void *malloc(size_t size) {
   struct superblock_pool *pool;
   struct superblock_bookkeeping *bkeep;
   void *rv = NULL;
