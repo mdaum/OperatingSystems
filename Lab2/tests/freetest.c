@@ -5,12 +5,12 @@
 
 int main() {
   //test one allocation at max size
-  void *a = malloc(43);
+  void *a = malloc(432);
   printf("orig 2048: %p\n", a);
   //free it
   free(a);
   //reallocate at max level
-  void *b = malloc(43);
+  void *b = malloc(512);
   printf("new 2048:  %p\n", b);
   return (errno);
 }

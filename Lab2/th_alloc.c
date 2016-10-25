@@ -81,8 +81,8 @@ static inline int size2level (ssize_t size) {
    */
   if (size <= 32) return 0;
   int i = -5;
-  if (size % 2 != 0) ++i;
-  while(size >>= 1) ++i;
+  if (!((size != 0) && !(size & (size - 1)))) ++i;
+  while (size >>= 1) ++i;
   return i;
 }
 
@@ -134,6 +134,7 @@ void *malloc(size_t size) {
   struct superblock_bookkeeping *bkeep;
   void *rv = NULL;
   int power = size2level(size);
+  printf("POWER: %d\n", power);
 
   // Check that the allocation isn't too big
   if (size > MAX_ALLOC) {
@@ -142,6 +143,8 @@ void *malloc(size_t size) {
   }
 
   pool = &levels[power];
+
+  printf("Free objects in pool: %d\n", pool->free_objects);
 
   if (!pool->free_objects) {
     bkeep = alloc_super(power);
@@ -162,6 +165,7 @@ void *malloc(size_t size) {
       --bkeep->free_count;
       break;
     }
+    puts("You shouldn't be here.");
     bkeep = bkeep->next;
   }
 
@@ -183,6 +187,7 @@ struct superblock_bookkeeping * obj2bkeep (void *ptr) {
 
 void free(void *ptr) {
   struct superblock_bookkeeping *bkeep = obj2bkeep(ptr);
+  printf("Free objects: %d, full pages: %d\n", levels[bkeep->level].free_objects, levels[bkeep->level].whole_superblocks);
 
   // Your code here.
   //   Be sure to put this back on the free list, and update the
