@@ -93,10 +93,10 @@ struct superblock_bookkeeping * alloc_super (int power) {
   struct superblock* sb;
   int free_objects = 0, bytes_per_object = 0;
   char *cursor;
-  // Your code here  
+  // Your code here
   // Allocate a page of anonymous memory
   // WARNING: DO NOT use brk---use mmap, lest you face untold suffering
-  
+
   page = mmap(NULL, SUPER_BLOCK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
   sb = (struct superblock*) page;
@@ -104,15 +104,14 @@ struct superblock_bookkeeping * alloc_super (int power) {
   sb->bkeep.next = levels[power].next;
   levels[power].next = &sb->bkeep;
   levels[power].whole_superblocks++;
-  sb->bkeep.level = power;
-  printf("malloc.bkeep.level is %d\n",sb->bkeep.level);
-  sb->bkeep.free_list = NULL;
+  levels[power].next->level = power;
+  levels[power].next->free_list = NULL;
 
   // Your code here: Calculate and fill the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
   free_objects = (SUPER_BLOCK_SIZE >> (power+5)) - 1;
-  sb->bkeep.free_count = free_objects;
+  levels[power].next->free_count = free_objects;
   levels[power].free_objects += free_objects;
   bytes_per_object = 2 << (power+5);
 
@@ -146,7 +145,6 @@ void *malloc(size_t size) {
 
   if (!pool->free_objects) {
     bkeep = alloc_super(power);
-	puts("we allocated a new superblock");
   } else bkeep = pool->next;
 
   while (bkeep != NULL) {
@@ -180,7 +178,7 @@ static inline
 struct superblock_bookkeeping * obj2bkeep (void *ptr) {
   uint64_t addr = (uint64_t) ptr;
   addr &= SUPER_BLOCK_MASK;
-  return (struct superblock_bookkeeping *) addr;
+  return (struct superblock_bookkeeping *) (addr -= 0x1000);
 }
 
 void free(void *ptr) {
@@ -195,9 +193,9 @@ void free(void *ptr) {
   bkeep->free_list=tmp;
   bkeep->free_count++;
   levels[bkeep->level].free_objects++;
-  printf("bkeep.free_count is %d\n",bkeep->free_count);
-  printf("free objects in level %d is %d\n",bkeep->level, levels[bkeep->level].free_objects);
-  if(bkeep->free_count==(SUPER_BLOCK_SIZE >> (bkeep->level+5)) - 1) levels[bkeep->level].whole_superblocks++;
+  //printf("free objects in level %d is %d\n",bkeep->level, levels[bkeep->level].free_objects);
+  if (bkeep->free_count == ((SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1))
+    levels[bkeep->level].whole_superblocks++;
 
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
     // Exercise 4: Your code here
