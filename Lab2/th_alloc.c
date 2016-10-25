@@ -105,6 +105,7 @@ struct superblock_bookkeeping * alloc_super (int power) {
   levels[power].next = &sb->bkeep;
   levels[power].whole_superblocks++;
   sb->bkeep.level = power;
+  printf("malloc.bkeep.level is %d\n",sb->bkeep.level);
   sb->bkeep.free_list = NULL;
 
   // Your code here: Calculate and fill the number of free objects in this superblock
@@ -114,7 +115,6 @@ struct superblock_bookkeeping * alloc_super (int power) {
   sb->bkeep.free_count = free_objects;
   levels[power].free_objects += free_objects;
   bytes_per_object = 2 << (power+5);
-
 
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
@@ -146,6 +146,7 @@ void *malloc(size_t size) {
 
   if (!pool->free_objects) {
     bkeep = alloc_super(power);
+	puts("we allocated a new superblock");
   } else bkeep = pool->next;
 
   while (bkeep != NULL) {
@@ -158,7 +159,7 @@ void *malloc(size_t size) {
       //     superblock, decrement levels[power]->whole_superblocks
       bkeep->free_list = next->next;
       rv = next;
-      if ((SUPER_BLOCK_SIZE >> (power+5)) == bkeep->free_count) --pool->whole_superblocks;
+      if ((SUPER_BLOCK_SIZE >> (power+5))-1 > bkeep->free_count) --pool->whole_superblocks;
       --pool->free_objects;
       --bkeep->free_count;
       break;
@@ -189,6 +190,14 @@ void free(void *ptr) {
   //   Be sure to put this back on the free list, and update the
   //   free count.  If you add the final object back to a superblock,
   //   making all objects free, increment whole_superblocks.
+  struct object * tmp =(struct object *)ptr;
+  tmp->next=bkeep->free_list;
+  bkeep->free_list=tmp;
+  bkeep->free_count++;
+  levels[bkeep->level].free_objects++;
+  printf("bkeep.free_count is %d\n",bkeep->free_count);
+  printf("free objects in level %d is %d\n",bkeep->level, levels[bkeep->level].free_objects);
+  if(bkeep->free_count==(SUPER_BLOCK_SIZE >> (bkeep->level+5)) - 1) levels[bkeep->level].whole_superblocks++;
 
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
     // Exercise 4: Your code here
