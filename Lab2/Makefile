@@ -1,4 +1,4 @@
-all: th_alloc test size2leveltest malloctest freetest
+all: th_alloc test size2leveltest malloctest freetest exercise4test
 
 th_alloc: th_alloc.c
 	gcc -fPIC -pedantic -Wall -Wextra -g -shared th_alloc.c -o th_alloc.so
@@ -14,6 +14,9 @@ malloctest: tests/malloctest.c
 	
 freetest: tests/freetest.c
 	gcc -pedantic -Wall -Wextra -g tests/freetest.c -o freetest	
+	
+exercise4test: tests/exercise4test.c
+	gcc -pedantic -Wall -Wextra -g tests/exercise4test.c -o exercise4test	
 
 clean:
 	rm *test th_alloc.so
