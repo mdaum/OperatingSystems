@@ -143,7 +143,6 @@ void *malloc(size_t size) {
 
   pool = &levels[power];
 
-
   if (!pool->free_objects) {
     bkeep = alloc_super(power);
   } else bkeep = pool->next;
