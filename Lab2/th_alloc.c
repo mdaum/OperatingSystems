@@ -173,7 +173,7 @@ void *malloc(size_t size) {
    * Hint: use ALLOC_POISON
    */
 
-  //memset(bkeep, FREE_POISON, 2 << (bkeep->level + 4));
+  memset(bkeep + sizeof(struct object*), FREE_POISON, 2 << (bkeep->level + 4));
   return rv;
 }
 
@@ -210,6 +210,7 @@ void free(void *ptr) {
       levels[bkeep->level].whole_superblocks,
       bkeep->free_count);
 
+  memset(ptr + sizeof(struct object*), FREE_POISON, 2 >> (bkeep->level + 4));
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
     // Exercise 4: Your code here
     // Remove a whole superblock from the level
@@ -218,10 +219,6 @@ void free(void *ptr) {
     break; // hack to keep this loop from hanging; remove in ex 4
   }
 
-  /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
-   * Hint: use FREE_POISON
-   */
-  //memset(ptr, FREE_POISON, 2 >> (bkeep->level + 4));
 }
 
 // Do NOT touch this - this will catch any attempt to load this into a multi-threaded app
