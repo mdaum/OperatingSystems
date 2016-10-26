@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/mman.h>
+#include <string.h>
 
 #define assert(cond) if (!(cond)) __asm__ __volatile__ ("int $3")
 
@@ -110,10 +111,10 @@ struct superblock_bookkeeping * alloc_super (int power) {
   // Your code here: Calculate and fill the number of free objects in this superblock
   //  Be sure to add this many objects to levels[power]->free_objects, reserving
   //  the first one for the bookkeeping.
-  free_objects = (SUPER_BLOCK_SIZE >> (power+5)) - 1;
+  free_objects = (SUPER_BLOCK_SIZE >> (power + 5)) - 1;
   levels[power].next->free_count = free_objects;
   levels[power].free_objects += free_objects;
-  bytes_per_object = 2 << (power+5);
+  bytes_per_object = 2 << (power + 4);
 
   // The following loop populates the free list with some atrocious
   // pointer math.  You should not need to change this, provided that you
@@ -171,6 +172,8 @@ void *malloc(size_t size) {
   /* Exercise 3: Poison a newly allocated object to detect init errors.
    * Hint: use ALLOC_POISON
    */
+
+  //memset(bkeep, FREE_POISON, 2 << (bkeep->level + 4));
   return rv;
 }
 
@@ -178,7 +181,7 @@ static inline
 struct superblock_bookkeeping * obj2bkeep (void *ptr) {
   uint64_t addr = (uint64_t) ptr;
   addr &= SUPER_BLOCK_MASK;
-  return (struct superblock_bookkeeping *) (addr -= 0x1000);
+  return (struct superblock_bookkeeping *) addr;
 }
 
 void free(void *ptr) {
@@ -208,7 +211,6 @@ void free(void *ptr) {
       bkeep->free_count);
 
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
-    puts("TEST");
     // Exercise 4: Your code here
     // Remove a whole superblock from the level
     // Return that superblock to the OS, using mmunmap
@@ -219,6 +221,7 @@ void free(void *ptr) {
   /* Exercise 3: Poison a newly freed object to detect use-after-free errors.
    * Hint: use FREE_POISON
    */
+  //memset(ptr, FREE_POISON, 2 >> (bkeep->level + 4));
 }
 
 // Do NOT touch this - this will catch any attempt to load this into a multi-threaded app
