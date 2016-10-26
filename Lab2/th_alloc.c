@@ -134,7 +134,6 @@ void *malloc(size_t size) {
   struct superblock_bookkeeping *bkeep;
   void *rv = NULL;
   int power = size2level(size);
-  printf("POWER: %d\n", power);
 
   // Check that the allocation isn't too big
   if (size > MAX_ALLOC) {
@@ -144,7 +143,6 @@ void *malloc(size_t size) {
 
   pool = &levels[power];
 
-  printf("Free objects in pool: %d\n", pool->free_objects);
 
   if (!pool->free_objects) {
     bkeep = alloc_super(power);
@@ -160,12 +158,11 @@ void *malloc(size_t size) {
       //     superblock, decrement levels[power]->whole_superblocks
       bkeep->free_list = next->next;
       rv = next;
-      if ((SUPER_BLOCK_SIZE >> (power+5))-1 > bkeep->free_count) --pool->whole_superblocks;
+      if ((SUPER_BLOCK_SIZE >> (power+5)) - 1 == bkeep->free_count) pool->whole_superblocks--;
       --pool->free_objects;
       --bkeep->free_count;
       break;
     }
-    puts("You shouldn't be here.");
     bkeep = bkeep->next;
   }
 
@@ -187,7 +184,11 @@ struct superblock_bookkeeping * obj2bkeep (void *ptr) {
 
 void free(void *ptr) {
   struct superblock_bookkeeping *bkeep = obj2bkeep(ptr);
-  printf("Free objects: %d, full pages: %d\n", levels[bkeep->level].free_objects, levels[bkeep->level].whole_superblocks);
+  printf("Free in level %d before:\n Total free objects: %d\n Whole superblocks: %d\n Free objects in superblock: %d\n",
+      bkeep->level,
+      levels[bkeep->level].free_objects,
+      levels[bkeep->level].whole_superblocks,
+      bkeep->free_count);
 
   // Your code here.
   //   Be sure to put this back on the free list, and update the
@@ -198,11 +199,17 @@ void free(void *ptr) {
   bkeep->free_list=tmp;
   bkeep->free_count++;
   levels[bkeep->level].free_objects++;
-  //printf("free objects in level %d is %d\n",bkeep->level, levels[bkeep->level].free_objects);
   if (bkeep->free_count == ((SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1))
     levels[bkeep->level].whole_superblocks++;
 
+  printf("Free in level %d after:\n Total free objects: %d\n Whole superblocks: %d\n Free objects in superblock: %d\n",
+      bkeep->level,
+      levels[bkeep->level].free_objects,
+      levels[bkeep->level].whole_superblocks,
+      bkeep->free_count);
+
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
+    puts("TEST");
     // Exercise 4: Your code here
     // Remove a whole superblock from the level
     // Return that superblock to the OS, using mmunmap
