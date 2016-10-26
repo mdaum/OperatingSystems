@@ -173,7 +173,7 @@ void *malloc(size_t size) {
    * Hint: use ALLOC_POISON
    */
 
-  memset(bkeep + sizeof(struct object*), FREE_POISON, 2 << (bkeep->level + 4));
+  memset(rv, FREE_POISON, 2 << (bkeep->level + 4));
   return rv;
 }
 
@@ -210,7 +210,7 @@ void free(void *ptr) {
       levels[bkeep->level].whole_superblocks,
       bkeep->free_count);
 
-  memset(ptr + sizeof(struct object*), FREE_POISON, 2 >> (bkeep->level + 4));
+  memset(ptr, FREE_POISON, 2 >> (bkeep->level + 4));
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
     // Exercise 4: Your code here
     // Remove a whole superblock from the level
