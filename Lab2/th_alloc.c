@@ -186,7 +186,7 @@ struct superblock_bookkeeping * obj2bkeep (void *ptr) {
 
 void free(void *ptr) {
   struct superblock_bookkeeping *bkeep = obj2bkeep(ptr);
-  printf("Free in level %d before:\n Total free objects: %d\n Whole superblocks: %d\n Free objects in superblock: %d\n",
+  printf("Free in level %d before:\n Total free objects: %lu\n Whole superblocks: %lu\n Free objects in superblock: %d\n",
       bkeep->level,
       levels[bkeep->level].free_objects,
       levels[bkeep->level].whole_superblocks,
@@ -215,7 +215,7 @@ void free(void *ptr) {
     --levels[bkeep->level].whole_superblocks;
     levels[bkeep->level].free_objects -= (SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1;
   }
-  printf("Free in level %d after:\n Total free objects: %d\n Whole superblocks: %d\n Free objects in superblock: %d\n",
+  printf("Free in level %d after:\n Total free objects: %lu\n Whole superblocks: %lu\n Free objects in superblock: %d\n",
       bkeep->level,
       levels[bkeep->level].free_objects,
       levels[bkeep->level].whole_superblocks,
