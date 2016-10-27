@@ -1,10 +1,10 @@
 /* Tar Heels Allocator
- * 
+ *
  * Simple Hoard-style malloc/free implementation.
- * Not suitable for use for large allocatoins, or 
+ * Not suitable for use for large allocatoins, or
  * in multi-threaded programs.
- * 
- * to use: 
+ *
+ * to use:
  * $ export LD_PRELOAD=/path/to/th_alloc.so <your command>
  */
 
@@ -173,7 +173,7 @@ void *malloc(size_t size) {
    * Hint: use ALLOC_POISON
    */
 
-  memset(rv, FREE_POISON, 2 << (bkeep->level + 4));
+  memset(rv, ALLOC_POISON, 2 << (bkeep->level + 4));
   return rv;
 }
 
@@ -186,32 +186,31 @@ struct superblock_bookkeeping * obj2bkeep (void *ptr) {
 
 void free(void *ptr) {
   struct superblock_bookkeeping *bkeep = obj2bkeep(ptr);
+  memset(ptr, FREE_POISON, 2 << (bkeep->level + 4));
   printf("Free in level %d before:\n Total free objects: %lu\n Whole superblocks: %lu\n Free objects in superblock: %d\n",
       bkeep->level,
       levels[bkeep->level].free_objects,
       levels[bkeep->level].whole_superblocks,
       bkeep->free_count);
-
   // Your code here.
   //   Be sure to put this back on the free list, and update the
   //   free count.  If you add the final object back to a superblock,
   //   making all objects free, increment whole_superblocks.
-  struct object * tmp =(struct object *)ptr;
-  tmp->next=bkeep->free_list;
-  bkeep->free_list=tmp;
+  struct object * tmp = (struct object *)ptr;
+  tmp->next = bkeep->free_list;
+  bkeep->free_list = tmp;
   bkeep->free_count++;
   levels[bkeep->level].free_objects++;
   if (bkeep->free_count == ((SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1))
     levels[bkeep->level].whole_superblocks++;
-
-  memset(ptr, FREE_POISON, 2 >> (bkeep->level + 4));
   while (levels[bkeep->level].whole_superblocks > RESERVE_SUPERBLOCK_THRESHOLD) {
     // Exercise 4: Your code here
     // Remove a whole superblock from the level
     // Return that superblock to the OS, using mmunmap
-    struct superblock_bookkeeping *bktmp = levels[bkeep->level].next;
-    while (bktmp->free_count != (SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1) bktmp = bktmp->next;
-    munmap(bktmp - (sizeof(struct superblock_bookkeeping*) + sizeof(void*)), SUPER_BLOCK_SIZE);
+    struct superblock_bookkeeping **bktmp = &levels[bkeep->level].next;
+    while ((*bktmp)->free_count != (SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1) bktmp = &(*bktmp)->next;
+    *bktmp = (*bktmp)->next;
+    munmap((*bktmp) - (sizeof(struct superblock_bookkeeping*) + sizeof(void*)), SUPER_BLOCK_SIZE);
     --levels[bkeep->level].whole_superblocks;
     levels[bkeep->level].free_objects -= (SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1;
   }
