@@ -13,5 +13,6 @@ Written by Max Daum and James Barbour
 
 ### Challenge Problems ###
 
-* 
+* Allows allocations/frees over 4KB, we simply return the larger alloc to OS after freeing each time.
+* Calloc implemented, and can also calloc allocations over 4KB.
 

@@ -86,7 +86,7 @@ static inline int size2level (ssize_t size) {
    */
   if (size <= 32) return 0;
   int i = -5;
-  if (!((size != 0) && !(size & (size - 1)))) ++i;
+  if (!((size != 0) && !(size & (size - 1)))) ++i; //checks to see if power of two...
   while (size >>= 1) ++i;
   return i;
 }
@@ -140,13 +140,13 @@ void *malloc(size_t size) {
   void *rv = NULL;
   int power = size2level(size);
 
-  if (size > MAX_ALLOC) {
-    struct superblock *sb = mmap(NULL, size + 32, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  if (size > MAX_ALLOC) { //allocate larger than 4KB
+    struct superblock *sb = mmap(NULL, size + 32, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0); //just adding 32 byte buffer for sb bookkeeping
     sb->bkeep.level = power;
-    struct object* tmp = (struct object *) (sb + 32);
+    struct object* tmp = (struct object *) (sb + 32); //we return object 32 byte away from sb bookkeeping to maintain it
     sb->bkeep.free_list = tmp;
     memset(sb->bkeep.free_list, ALLOC_POISON, size);
-    return sb->bkeep.free_list;
+    return sb->bkeep.free_list; //note this will always be the single object....
   }
 
   pool = &levels[power];
@@ -184,6 +184,53 @@ void *malloc(size_t size) {
   return rv;
 }
 
+
+void *calloc(size_t num,size_t size) { 
+  struct superblock_pool *pool;
+  struct superblock_bookkeeping *bkeep;
+  void *rv = NULL;
+   size*=num; //from here on, save for poisoning step really the same code.
+  int power = size2level(size);
+  if (size > MAX_ALLOC) { //can zero out allocations greater than 4KB
+    struct superblock *sb = mmap(NULL, size + 32, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    sb->bkeep.level = power;
+    struct object* tmp = (struct object *) (sb + 32);
+    sb->bkeep.free_list = tmp;
+    memset(sb->bkeep.free_list, ALLOC_POISON, size);
+    return sb->bkeep.free_list;
+  }
+
+  pool = &levels[power];
+
+  if (!pool->free_objects) {
+    bkeep = alloc_super(power);
+  } else bkeep = pool->next;
+
+  while (bkeep != NULL) {
+    if (bkeep->free_count) {
+      struct object *next = bkeep->free_list;
+      /* Remove an object from the free list. */
+      // Your code here
+      //
+      // NB: If you take the first object out of a whole
+      //     superblock, decrement levels[power]->whole_superblocks
+      bkeep->free_list = next->next;
+      rv = next;
+      if ((SUPER_BLOCK_SIZE >> (power+5)) - 1 == bkeep->free_count) pool->whole_superblocks--;
+      --pool->free_objects;
+      --bkeep->free_count;
+      break;
+    }
+    bkeep = bkeep->next;
+  }
+
+  // assert that rv doesn't end up being NULL at this point
+  assert(rv != NULL);
+
+  memset(rv,0, 2 << (bkeep->level + 4)); //instead of poisoning, zero out mem
+  return rv;
+}
+
 static inline
 struct superblock_bookkeeping * obj2bkeep (void *ptr) {
   uint64_t addr = (uint64_t) ptr;
@@ -194,10 +241,10 @@ struct superblock_bookkeeping * obj2bkeep (void *ptr) {
 void free(void *ptr) {
   struct superblock_bookkeeping *bkeep = obj2bkeep(ptr);
 
-  memset(ptr, FREE_POISON, 2 << (bkeep->level + 4));
+  memset(ptr, FREE_POISON, 2 << (bkeep->level + 4)); //poison first
 
-  if (bkeep->level > 6) {
-    munmap(&bkeep, 2 << (bkeep->level + 4));
+  if (bkeep->level > 6) { //handle allocations larger than 4KB
+    munmap(&bkeep, 2 << (bkeep->level + 4)); 
     return;
   }
 
@@ -216,11 +263,11 @@ void free(void *ptr) {
     // Exercise 4: Your code here
     // Remove a whole superblock from the level
     // Return that superblock to the OS, using mmunmap
-    struct superblock_bookkeeping **bktmp = &(levels[bkeep->level].next);
-    while ((*bktmp)->free_count != (SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1)
-      bktmp = &(*bktmp)->next;
-    void *rem = *bktmp;
-    *bktmp = (*bktmp)->next;
+    struct superblock_bookkeeping **bktmp = &(levels[bkeep->level].next); //pointer to pointer...ie can change its address
+    while ((*bktmp)->free_count != (SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1)//is this sb whole?
+      bktmp = &(*bktmp)->next; //bktmp points to mem location of bkeep.next
+    void *rem = *bktmp; // saving mem to be unmapped
+    *bktmp = (*bktmp)->next; //reassign mem address of bkeep to next.
     munmap(&rem, SUPER_BLOCK_SIZE);
     --levels[bkeep->level].whole_superblocks;
     levels[bkeep->level].free_objects -= (SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1;
