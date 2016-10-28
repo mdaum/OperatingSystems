@@ -8,6 +8,8 @@ int main() {
   e[0] = 'a';
   e[4990] = '\0';
   printf("%s", e);
+  free(e);
+  printf("%s", e);
 
   return (errno);
 }

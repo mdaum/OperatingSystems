@@ -13,7 +13,7 @@
 #define SUPER_BLOCK_SIZE 4096
 #define SUPER_BLOCK_MASK (~(SUPER_BLOCK_SIZE-1))
 #define MIN_ALLOC 32 /* Smallest real allocation.  Round smaller mallocs up */
-#define MAX_ALLOC 2048 /* Fail if anything bigger is attempted.  
+#define MAX_ALLOC 2048 /* Fail if anything bigger is attempted.
                         * Challenge: handle big allocations */
 #define RESERVE_SUPERBLOCK_THRESHOLD 2
 
@@ -48,19 +48,12 @@ struct __attribute__((packed)) superblock_bookkeeping {
   uint8_t level;
 };
 
-struct __attribute__((packed)) superblock_bookkeeping_large {
-  // Free count in this superblock
-  int size;
-  void* raw;
-};
-
 /* Superblock: a chunk of contiguous virtual memory.
  * Subdivide into allocations of same power-of-two size. */
 struct __attribute__((packed)) superblock {
   struct superblock_bookkeeping bkeep;
   void *raw;  // Actual data here
 };
-
 
 /* The structure for one pool of superblocks.
  * One of these per power-of-two */
@@ -142,13 +135,13 @@ void *malloc(size_t size) {
   void *rv = NULL;
   int power = size2level(size);
 
-  // Check that the allocation isn't too big
   if (size > MAX_ALLOC) {
-    puts("test");
-    struct superblock_bookkeeping_large *large = mmap(NULL, size + sizeof(struct superblock_bookkeeping_large*), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    large->size = size;
-    large->raw = large + sizeof(struct superblock_bookkeeping_large*);
-    return large->raw;
+    struct superblock *sb = mmap(NULL, size + 32, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    sb->bkeep.level = power;
+    struct object* tmp = (struct object *) (sb + 32);
+    sb->bkeep.free_list = tmp;
+    memset(sb->bkeep.free_list, ALLOC_POISON, size);
+    return sb->bkeep.free_list;
   }
 
   pool = &levels[power];
@@ -182,7 +175,7 @@ void *malloc(size_t size) {
    * Hint: use ALLOC_POISON
    */
 
-  //memset(rv, ALLOC_POISON, 2 << (bkeep->level + 4));
+  memset(rv, ALLOC_POISON, 2 << (bkeep->level + 4));
   return rv;
 }
 
@@ -195,14 +188,14 @@ struct superblock_bookkeeping * obj2bkeep (void *ptr) {
 
 void free(void *ptr) {
   struct superblock_bookkeeping *bkeep = obj2bkeep(ptr);
-  //memset(ptr, FREE_POISON, 2 << (bkeep->level + 4));
-  /*
-  printf("Free in level %d before:\n Total free objects: %lu\n Whole superblocks: %lu\n Free objects in superblock: %d\n",
-      bkeep->level,
-      levels[bkeep->level].free_objects,
-      levels[bkeep->level].whole_superblocks,
-      bkeep->free_count);
-      */
+
+  memset(ptr, FREE_POISON, 2 << (bkeep->level + 4));
+
+  if (bkeep->level > 6) {
+    munmap(&bkeep, 2 << (bkeep->level + 4));
+    return;
+  }
+
   // Your code here.
   //   Be sure to put this back on the free list, and update the
   //   free count.  If you add the final object back to a superblock,
@@ -227,13 +220,7 @@ void free(void *ptr) {
     --levels[bkeep->level].whole_superblocks;
     levels[bkeep->level].free_objects -= (SUPER_BLOCK_SIZE >> (bkeep->level + 5)) - 1;
   }
-  /*
-     printf("Free in level %d after:\n Total free objects: %lu\n Whole superblocks: %lu\n Free objects in superblock: %d\n",
-     bkeep->level,
-     levels[bkeep->level].free_objects,
-     levels[bkeep->level].whole_superblocks,
-     bkeep->free_count);
-     */
+
 }
 
 // Do NOT touch this - this will catch any attempt to load this into a multi-threaded app
