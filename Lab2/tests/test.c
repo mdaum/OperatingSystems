@@ -3,6 +3,12 @@
 #include <errno.h>
 #include <stdio.h>
 
+ /*
+ * Maxwell Daum and James Barbour
+ * Honor Code: We did not give or recieve any unpermitted information on this assignment. 
+ * All code (execpt for boilerplate) is our own.
+ */
+
 int main() {
   void *a = malloc(1024);
   printf("Hello %p\n", a);

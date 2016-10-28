@@ -3,6 +3,12 @@
 #include <errno.h>
 #include <stdio.h>
 
+ /*
+ * Maxwell Daum and James Barbour
+ * Honor Code: We did not give or recieve any unpermitted information on this assignment. 
+ * All code (execpt for boilerplate) is our own.
+ */
+
 int main() {
   int h, i, j;
   for (h = 0; h < 2; ++h) {

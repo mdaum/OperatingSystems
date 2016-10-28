@@ -3,6 +3,12 @@
 #include <errno.h>
 #include <stdio.h>
 
+ /*
+ * Maxwell Daum and James Barbour
+ * Honor Code: We did not give or recieve any unpermitted information on this assignment. 
+ * All code (execpt for boilerplate) is our own.
+ */
+
 int main() {
   //make 4 full superblocks at level 5
   void *a = malloc(1000);

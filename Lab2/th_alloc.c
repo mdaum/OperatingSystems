@@ -6,8 +6,13 @@
  *
  * to use:
  * $ export LD_PRELOAD=/path/to/th_alloc.so <your command>
+ *
  */
-
+ /*
+ * Maxwell Daum and James Barbour
+ * Honor Code: We did not give or recieve any unpermitted information on this assignment. 
+ * All code (execpt for boilerplate) is our own.
+ */
 /* Hard-code some system parameters */
 
 #define SUPER_BLOCK_SIZE 4096
