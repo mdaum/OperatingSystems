@@ -48,6 +48,12 @@ struct __attribute__((packed)) superblock_bookkeeping {
   uint8_t level;
 };
 
+struct __attribute__((packed)) superblock_bookkeeping_large {
+  // Free count in this superblock
+  int size;
+  void* raw;
+};
+
 /* Superblock: a chunk of contiguous virtual memory.
  * Subdivide into allocations of same power-of-two size. */
 struct __attribute__((packed)) superblock {
@@ -138,8 +144,11 @@ void *malloc(size_t size) {
 
   // Check that the allocation isn't too big
   if (size > MAX_ALLOC) {
-    errno = -ENOMEM;
-    return NULL;
+    puts("test");
+    struct superblock_bookkeeping_large *large = mmap(NULL, size + sizeof(struct superblock_bookkeeping_large*), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    large->size = size;
+    large->raw = large + sizeof(struct superblock_bookkeeping_large*);
+    return large->raw;
   }
 
   pool = &levels[power];
