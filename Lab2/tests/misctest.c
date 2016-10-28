@@ -14,11 +14,8 @@ int main() {
         printf("%d: %p %s\n", i, ptrs[j / (2 << (i+4))], ptrs[j / (2 << (i+4))]);
       }
       for (j = 2 << (i+4); j <= 16348; j += 2 << (i+4)) {
-        puts("test");
         free(ptrs[j / (2 << (i+4))]);
-        printf("%d: %p", i, ptrs[j / (2 << (i+4))]);
-        write(1, ptrs[j / (2 << (i+4))], sizeof("Hello"));
-        printf("\n");
+        printf("%d: %p %p\n", i, ptrs[j / (2 << (i+4))], ptrs[j / (2 << (i+4))]);
       }
       free(ptrs);
     }
