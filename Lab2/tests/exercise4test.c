@@ -9,6 +9,8 @@
  * All code (execpt for boilerplate) is our own.
  */
 
+//This test only outputs info when printing out the whole superblock count in free()
+
 int main() {
   //make 4 full superblocks at level 5
   void *a = malloc(1000);

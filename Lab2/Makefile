@@ -1,4 +1,4 @@
-all: th_alloc test misctest size2leveltest malloctest freetest exercise4test
+all: th_alloc test alltest calloctest largetest poisontest size2leveltest malloctest freetest exercise4test
 
 th_alloc: th_alloc.c
 	gcc -fPIC -Wall -Wextra -g -shared th_alloc.c -o th_alloc.so
@@ -6,8 +6,20 @@ th_alloc: th_alloc.c
 test: tests/test.c
 	gcc -Wall -Wextra -g tests/test.c -o test
 
-misctest: tests/misctest.c
-	gcc -Wall -Wextra -g tests/misctest.c -o misctest
+alltest: tests/alltest.c
+	gcc -Wall -Wextra -g tests/alltest.c -o alltest
+
+calloctest: tests/calloctest.c
+	gcc -Wall -Wextra -g tests/calloctest.c -o calloctest
+
+reallocationtest: tests/reallocationtest.c
+	gcc -Wall -Wextra -g tests/reallocationtest.c -o reallocationtest
+
+largetest: tests/largetest.c
+	gcc -Wall -Wextra -g tests/largetest.c -o largetest
+
+poisontest: tests/poisontest.c
+	gcc -Wall -Wextra -g tests/poisontest.c -o poisontest
 
 size2leveltest: tests/size2leveltest.c
 	gcc -Wall -Wextra -g tests/size2leveltest.c -o size2leveltest
