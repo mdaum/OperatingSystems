@@ -115,8 +115,9 @@ client(void *arg)
    * that the count didn't exceed the max.
    */
   if (!separate_delete_thread)
+	checkReachable();
     check_max_nodes();
-
+	checkReachable();
   return NULL;
 }
 

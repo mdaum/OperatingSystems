@@ -346,6 +346,8 @@ _delete (struct trie_node *node, const char *string,
 
 }
 
+
+
 int delete  (const char *string, size_t strlen) {
   // Skip strings of length 0
   if (strlen == 0)
@@ -354,23 +356,19 @@ int delete  (const char *string, size_t strlen) {
   return (NULL != _delete(root, string, strlen));
 }
 
-
-/* Find one node to remove from the tree. 
- * Use any policy you like to select the node.
- */
-int drop_one_node  () {
-  // Your code here
-  return 0;
+//Recursively checks number of reachable nodes using DFS
+int numReachable(struct trie_node *node){
+	int count=1;
+	if(!node)return 0;
+	if(node->children)
+		count+=numReachable(node->children);
+	if(node->next)
+		count+=numReachable(node->next);
+	return count;
 }
 
-/* Check the total node count; see if we have exceeded a the max.
- */
-void check_max_nodes  () {
-  while (node_count > max_count) {
-    printf("Warning: not dropping nodes yet.  Drop one node not implemented\n");
-    break;
-    //drop_one_node();
-  }
+void checkReachable (){
+	 assert(numReachable(root)==node_count); //adding in assertion for sequential trie
 }
 
 
@@ -388,4 +386,46 @@ void print() {
   /* Do a simple depth-first search */
   if (root)
     _print(root);
+	
+  printf("Num Nodes:%d\nNum Reachable:%d\n",node_count,numReachable(root)); //view numNodes at hend
 }
+
+/* Find one node to remove from the tree. 
+ * Use any policy you like to select the node.
+ */
+int drop_one_node  () { //finding first leaf and killing it
+  int oldcount=node_count;
+  assert(node_count > max_count);
+	struct trie_node *b4Temp = NULL; 
+	struct trie_node *temp = root;
+	while(temp->children!=NULL){
+		b4Temp=temp;
+		temp=temp->children;
+	}
+	if(temp==root){ //edge case: root has no children
+		root=temp->next;
+		assert(b4Temp==NULL);
+	}
+	else{ //root has children
+		assert(b4Temp->children == temp);
+		assert(temp->children==NULL);
+		b4Temp->children = temp->next;
+	}
+	temp->ip4_address=0;
+	free(temp);
+	node_count--;
+  assert(node_count==oldcount-1);
+  return 1;
+}
+
+/* Check the total node count; see if we have exceeded a the max.
+ */
+void check_max_nodes  () {
+  while (node_count > max_count) {
+	  drop_one_node();
+  }
+	assert (node_count <= max_count);
+}
+
+
+

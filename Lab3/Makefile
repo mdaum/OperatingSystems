@@ -18,4 +18,4 @@ dns-fine: main.c fine-trie.o
 	gcc $(CFLAGS) -o dns-fine fine-trie.o main.c
 
 clean:
-	rm -f *~ *.o dns-sequential dns-mutex dns-rw dns-fine
+	rm -f *~ *.o dns-sequential dns-mutex dns-rw dns-fine seqout.txt
