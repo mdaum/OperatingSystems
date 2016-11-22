@@ -14,7 +14,7 @@ struct trie_node {
   char key[64]; /* Up to 64 chars */
 };
 
-static pthread_mutex_t trie_mutex;
+pthread_mutex_t trie_mutex=PTHREAD_MUTEX_INITIALIZER;
 
 static struct trie_node * root = NULL;
 static int node_count = 0;
@@ -53,8 +53,11 @@ int compare_keys (const char *string1, int len1, const char *string2, int len2, 
 void init(int numthreads) {
   if (numthreads == 1)
     printf("WARNING: This is meant to be used with multiple threads!!!  You have %d!!!\n", numthreads);
+  
+  pthread_mutex_lock(&trie_mutex);
   root = NULL;
-	pthread_mutex_init(&trie_mutex, NULL);
+  pthread_mutex_unlock(&trie_mutex);
+	//hread_mutex_init(&trie_mutex, NULL);
 }
 
 /* Recursive helper function.
@@ -413,7 +416,7 @@ void print() {
  * Use any policy you like to select the node.
  */
 int drop_one_node  () { //finding first leaf and killing it
-	 pthread_mutex_lock(&trie_mutex);
+	// pthread_mutex_lock(&trie_mutex);
   int oldcount=node_count;
   assert(node_count > max_count);
 	struct trie_node *b4Temp = NULL; 
@@ -435,7 +438,7 @@ int drop_one_node  () { //finding first leaf and killing it
 	free(temp);
 	node_count--;
   assert(node_count==oldcount-1);
-	 pthread_mutex_unlock(&trie_mutex);
+//	 pthread_mutex_unlock(&trie_mutex);
   return 1;
 }
 

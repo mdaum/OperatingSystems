@@ -316,6 +316,8 @@ int main(int argc, char ** argv) {
   /* Print the final tree for fun */
   print();
 #endif
+  checkReachable();//final test to see if you have valid tree
+  print();
   
   return 0;
 }

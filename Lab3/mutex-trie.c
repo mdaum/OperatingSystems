@@ -80,8 +80,8 @@ int compare_keys_substring (const char *string1, int len1, const char *string2, 
 void init(int numthreads) {
   if (numthreads == 1)
     printf("WARNING: This is meant to be used with multiple threads!!!  You have %d!!!\n", numthreads);
+	assert(pthread_mutex_init(&trie_mutex, NULL)==0);//make sure mutex is made
   root = NULL;
-	pthread_mutex_init(&trie_mutex, NULL);
 }
 
 /* Recursive helper function.
@@ -132,16 +132,19 @@ _search (struct trie_node *node, const char *string, size_t strlen) {
 
 int search  (const char *string, size_t strlen, int32_t *ip4_address) {
   struct trie_node *found;
-
+    assert(pthread_mutex_lock(&trie_mutex)==0); //lock beginning of mutex section
   // Skip strings of length 0
-  if (strlen == 0)
+  if (strlen == 0){
+	  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
     return 0;
+  }
 
   found = _search(root, string, strlen);
   
   if (found && ip4_address)
     *ip4_address = found->ip4_address;
-
+	
+  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
   return (found != NULL);
 }
 
@@ -274,16 +277,22 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
 }
 
 int insert (const char *string, size_t strlen, int32_t ip4_address) {
+	assert(pthread_mutex_lock(&trie_mutex)==0);//lock start mutex sections
   // Skip strings of length 0
-  if (strlen == 0)
+  if (strlen == 0){
+	  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
     return 0;
+  }
 
   /* Edge case: root is null */
   if (root == NULL) {
     root = new_leaf (string, strlen, ip4_address);
+	  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
     return 1;
   }
-  return _insert (string, strlen, ip4_address, root, NULL, NULL);
+  int ret= _insert (string, strlen, ip4_address, root, NULL, NULL);
+	assert(pthread_mutex_unlock(&trie_mutex)==0);//potential unlock
+	return ret;
 }
 
 /* Recursive helper function.
@@ -383,11 +392,16 @@ _delete (struct trie_node *node, const char *string,
 }
 
 int delete  (const char *string, size_t strlen) {
+	assert(pthread_mutex_lock(&trie_mutex)==0);//lock, start mutex section
   // Skip strings of length 0
-  if (strlen == 0)
+  if (strlen == 0){
+	assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
     return 0;
+  }
 
-  return (NULL != _delete(root, string, strlen));
+  int ret =(NULL != _delete(root, string, strlen));
+	assert(pthread_mutex_unlock(&trie_mutex)==0);// potential unlock
+	return ret;
 }
 
 
@@ -403,7 +417,9 @@ int numReachable(struct trie_node *node){
 }
 
 void checkReachable (){
+	assert(pthread_mutex_lock(&trie_mutex)==0); //lock before entering function
 	 assert(numReachable(root)==node_count); //adding in assertion for sequential trie
+	assert(pthread_mutex_unlock(&trie_mutex)==0); //unlock
 }
 
 
@@ -416,7 +432,7 @@ void _print (struct trie_node *node) {
     _print(node->next);
 }
 
-void print() {
+void print() { //not gonna worry about it
   printf ("Root is at %p\n", root);
   /* Do a simple depth-first search */
   if (root)
@@ -428,7 +444,7 @@ void print() {
 /* Find one node to remove from the tree. 
  * Use any policy you like to select the node.
  */
-int drop_one_node  () { //finding first leaf and killing it
+int drop_one_node  () { //finding first leaf and killing it....not locking helper functions (that killed me earlier in debugging :o)
   int oldcount=node_count;
   assert(node_count > max_count);
 	struct trie_node *b4Temp = NULL; 
@@ -456,8 +472,10 @@ int drop_one_node  () { //finding first leaf and killing it
 /* Check the total node count; see if we have exceeded a the max.
  */
 void check_max_nodes  () {
+	assert(pthread_mutex_lock(&trie_mutex)==0);//lock
   while (node_count > max_count) {
 	  drop_one_node();
   }
 	assert (node_count <= max_count);
+	assert(pthread_mutex_unlock(&trie_mutex)==0);//unlock
 }
