@@ -1,4 +1,4 @@
-all: dns-sequential dns-mutex dns-rw dns-fine
+all: dns-sequential dns-dirty dns-mutex dns-rw dns-fine
 
 CFLAGS = -g -Wall -Werror -pthread
 
@@ -10,6 +10,9 @@ dns-sequential: main.c sequential-trie.o
 
 dns-mutex: main.c mutex-trie.o
 	gcc $(CFLAGS) -o dns-mutex mutex-trie.o main.c
+	
+dns-dirty: main.c mutex-trie-ROUGH.o
+	gcc $(CFLAGS) -o dns-dirty mutex-trie-ROUGH.o main.c
 
 dns-rw: main.c rw-trie.o
 	gcc $(CFLAGS) -o dns-rw rw-trie.o main.c
@@ -18,4 +21,4 @@ dns-fine: main.c fine-trie.o
 	gcc $(CFLAGS) -o dns-fine fine-trie.o main.c
 
 clean:
-	rm -f *~ *.o dns-sequential dns-mutex dns-rw dns-fine seqout.txt
+	rm -f *~ *.o dns-sequential dns-mutex dns-rw dns-fine seqout.txt dns-dirty

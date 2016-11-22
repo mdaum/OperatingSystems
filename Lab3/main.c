@@ -114,7 +114,7 @@ client(void *arg)
   /* If we don't have a separate delete thread, the client needs to make sure
    * that the count didn't exceed the max.
    */
-  if (!separate_delete_thread)
+  if (!separate_delete_thread) //adding assertion for numNodes here...
 	checkReachable();
     check_max_nodes();
 	checkReachable();
@@ -191,6 +191,29 @@ int self_tests() {
   rv = delete("ab", 2);
   if (!rv) die ("Failed to delete real key ab\n");
 
+  // Tests suggested by Ruibin
+  rv = insert("bbb", 3, 5);
+  if (!rv) die ("Failed to insert key bbb\n");
+
+  rv = insert("cccc", 4, 6);
+  if (!rv) die ("Failed to insert key cccc\n");
+
+  rv = insert("xaaa", 4, 7);
+  if (!rv) die ("Failed to insert key xaaa\n");
+  
+  rv = search("cccc", 4, &ip);
+  if (!rv) die ("Failed to find key cccc\n");
+  if (ip != 6) die ("Found bad IP for key cccc\n");
+
+  rv = delete("cccc", 4);
+  if (!rv) die ("Failed to delete real key cccc\n");
+
+  rv = delete("bbb", 3);
+  if (!rv) die ("Failed to delete real key bbb\n");
+
+  rv = delete("xaaa", 4);
+  if (!rv) die ("Failed to delete real key xaaa\n");
+  
   printf("End of self-tests, tree is:\n");
   print();
   printf("End of self-tests\n");
