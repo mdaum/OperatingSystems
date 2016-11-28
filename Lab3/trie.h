@@ -46,6 +46,7 @@ extern int allow_squatting;
 extern pthread_cond_t isFull;
 extern pthread_cond_t isReady;
 extern pthread_mutex_t trie_mutex;
+extern int node_count;
 
 
 #endif /* __TRIE_H__ */ 

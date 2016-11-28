@@ -15,7 +15,7 @@ struct trie_node {
 };
 
 static struct trie_node * root = NULL;
-static int node_count = 0;
+int node_count = 0;
 static int max_count = 100;  //Try to stay at no more than 100 nodes
 pthread_mutex_t trie_mutex;
 pthread_cond_t isFull;

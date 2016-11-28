@@ -31,15 +31,15 @@ volatile int finished = 0;
 static void *
 delete_thread(void *arg) {
 	int num=0;
-	pthread_mutex_lock(&trie_mutex); //must first acquire lock
   while (!finished){
-	pthread_cond_wait(&isFull,&trie_mutex); 
+	pthread_mutex_lock(&trie_mutex); //must first acquire lock
+	while(node_count<=100)pthread_cond_wait(&isFull,&trie_mutex); 
     check_max_nodes();
 	num++;
 	pthread_cond_signal(&isReady);
+	pthread_mutex_unlock(&trie_mutex); //in case of race condition where finished occurs while executing loop
   }
-  pthread_mutex_unlock(&trie_mutex); //in case of race condition where finished occurs while executing loop
-  printf("ran delete_thread %d times\n",num);
+  printf("ran delete_thread %d times\n",num); //comment out for final version
   return NULL;
 }
 

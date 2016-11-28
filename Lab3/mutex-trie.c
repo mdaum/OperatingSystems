@@ -15,7 +15,7 @@ struct trie_node {
 };
 
 static struct trie_node * root = NULL;
-static int node_count = 0;
+ int node_count = 0;
 static int max_count = 100;  //Try to stay at no more than 100 nodes
 
 pthread_mutex_t trie_mutex;
@@ -304,7 +304,7 @@ int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFAC
   }
   int ret= _insert (string, strlen, ip4_address, root, NULL, NULL);
   //only need to check size here....
-	pthread_cond_signal(&isFull); //wake up delete_thread
+	if(node_count>100) pthread_cond_signal(&isFull); //wake up delete_thread
 	assert(pthread_mutex_unlock(&trie_mutex)==0);//potential unlock
 	return ret;
 }
