@@ -17,9 +17,6 @@ struct trie_node {
 static struct trie_node * root = NULL;
 int node_count = 0;
 static int max_count = 100;  //Try to stay at no more than 100 nodes
-pthread_mutex_t trie_mutex;
-pthread_cond_t isFull;
-pthread_cond_t isReady;
 
 struct trie_node * new_leaf (const char *string, size_t strlen, int32_t ip4_address) {
   struct trie_node *new_node = malloc(sizeof(struct trie_node));
@@ -82,10 +79,6 @@ int compare_keys_substring (const char *string1, int len1, const char *string2, 
 void init(int numthreads) {
   if (numthreads != 1)
     printf("WARNING: This Trie is only safe to use with one thread!!!  You have %d!!!\n", numthreads);
-
-	assert(pthread_mutex_init(&trie_mutex, NULL)==0);//make sure mutex is made
-	assert(pthread_cond_init(&isFull, NULL)==0);//make sure cond var is made
-	assert(pthread_cond_init(&isReady, NULL)==0);//make sure cond var is made
   root = NULL;
 }
 

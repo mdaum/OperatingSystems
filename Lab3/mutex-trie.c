@@ -20,7 +20,6 @@ static int max_count = 100;  //Try to stay at no more than 100 nodes
 
 pthread_mutex_t trie_mutex;
 pthread_cond_t isFull;
-pthread_cond_t isReady;
 
 struct trie_node * new_leaf (const char *string, size_t strlen, int32_t ip4_address) {
   struct trie_node *new_node = malloc(sizeof(struct trie_node));
@@ -85,7 +84,6 @@ void init(int numthreads) {
     printf("WARNING: This is meant to be used with multiple threads!!!  You have %d!!!\n", numthreads);
 	assert(pthread_mutex_init(&trie_mutex, NULL)==0);//make sure mutex is made
 	assert(pthread_cond_init(&isFull, NULL)==0);//make sure cond var is made
-	assert(pthread_cond_init(&isReady, NULL)==0);//make sure cond var is made
   root = NULL;
 }
 
@@ -100,7 +98,6 @@ void handle_delete_thread(){ //called from main delete_thread
 	pthread_mutex_lock(&trie_mutex); //must first acquire lock
 	while(node_count<=100)pthread_cond_wait(&isFull,&trie_mutex); 
     check_max_nodes_delThread();
-	pthread_cond_signal(&isReady);
 	pthread_mutex_unlock(&trie_mutex);
 	return;
 }
@@ -301,6 +298,7 @@ int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFAC
  	assert(pthread_mutex_lock(&trie_mutex)==0);//lock start mutex sections
   // Skip strings of length 0
   if (strlen == 0){
+	  if(node_count>100) pthread_cond_signal(&isFull); //wake up delete_thread
 	  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
     return 0;
   }
@@ -308,7 +306,8 @@ int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFAC
   /* Edge case: root is null */
   if (root == NULL) {
     root = new_leaf (string, strlen, ip4_address);
-	  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
+	if(node_count>100) pthread_cond_signal(&isFull); //wake up delete_thread
+	assert(pthread_mutex_unlock(&trie_mutex)==0);//potential unlock
     return 1;
   }
   int ret= _insert (string, strlen, ip4_address, root, NULL, NULL);
