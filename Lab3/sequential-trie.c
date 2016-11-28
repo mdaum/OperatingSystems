@@ -94,6 +94,11 @@ void shutdown_delete_thread() {
   return;
 }
 
+void handle_delete_thread(){
+	//don't need to do anything in sequential case
+	return;
+}
+
 /* Recursive helper function.
  * Returns a pointer to the node if found.
  * Stores an optional pointer to the 
@@ -465,6 +470,10 @@ void check_max_nodes  () {
 	  drop_one_node();
   }
 	assert (node_count <= max_count);
+}
+
+void check_max_nodes_delThread(){
+	return;//does nothing in sequential...
 }
 
 

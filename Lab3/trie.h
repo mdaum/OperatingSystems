@@ -26,9 +26,13 @@ int delete  (const char *string, size_t strlen);
  * If we have exceeded it, drop some nodes
  * to lower the count.
  */
-void check_max_nodes  ();
+void check_max_nodes ();
 
+void check_max_nodes_delThread();//used from delThread...since you do not lock in this one....could of added an int param to 
+//original method but did not want to modify anything already given in the interface...
 void shutdown_delete_thread(); //need here so main can call it
+
+void handle_delete_thread();
 
 void checkReachable (); //check for reachable //not Thread-Safe! used for checking tree after done w/ simulation
 
@@ -42,11 +46,6 @@ void print ();
  * a name is available.
  */
 extern int allow_squatting;
-
-extern pthread_cond_t isFull;
-extern pthread_cond_t isReady;
-extern pthread_mutex_t trie_mutex;
-extern int node_count;
 
 
 #endif /* __TRIE_H__ */ 

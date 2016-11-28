@@ -96,6 +96,15 @@ void shutdown_delete_thread() {
   return;
 }
 
+void handle_delete_thread(){ //called from main delete_thread
+	pthread_mutex_lock(&trie_mutex); //must first acquire lock
+	while(node_count<=100)pthread_cond_wait(&isFull,&trie_mutex); 
+    check_max_nodes_delThread();
+	pthread_cond_signal(&isReady);
+	pthread_mutex_unlock(&trie_mutex);
+	return;
+}
+
 
 /* Recursive helper function.
  * Returns a pointer to the node if found.
@@ -486,12 +495,20 @@ int drop_one_node  () { //finding first leaf and killing it
  */
  //INTERFACE
 void check_max_nodes  () {
+	pthread_mutex_lock(&trie_mutex);
+  while (node_count > max_count) {
+	  drop_one_node();
+  }
+	assert (node_count <= max_count);
+	pthread_mutex_unlock(&trie_mutex);
+}
+//INTERFACE
+void check_max_nodes_delThread  () {
   while (node_count > max_count) {
 	  drop_one_node();
   }
 	assert (node_count <= max_count);
 }
-
 
 void _print (struct trie_node *node) {
   printf ("Node at %p.  Key %.*s, IP %d.  Next %p, Children %p\n", 

@@ -30,16 +30,9 @@ volatile int finished = 0;
 
 static void *
 delete_thread(void *arg) {
-	int num=0;
   while (!finished){
-	pthread_mutex_lock(&trie_mutex); //must first acquire lock
-	while(node_count<=100)pthread_cond_wait(&isFull,&trie_mutex); 
-    check_max_nodes();
-	num++;
-	pthread_cond_signal(&isReady);
-	pthread_mutex_unlock(&trie_mutex); //in case of race condition where finished occurs while executing loop
+	handle_delete_thread();//calls trie method...so I can use mutex/cond vars I want per impl
   }
-  printf("ran delete_thread %d times\n",num); //comment out for final version
   return NULL;
 }
 
@@ -122,11 +115,7 @@ client(void *arg)
      * make sure that the count didn't exceed the max.
      */
 	if (!separate_delete_thread){
-		//checkReachable(); //adding in reachable node test case
-		pthread_mutex_lock(&trie_mutex);
 		check_max_nodes();
-		pthread_mutex_unlock(&trie_mutex);
-		//checkReachable();
 	}	
   }
 
