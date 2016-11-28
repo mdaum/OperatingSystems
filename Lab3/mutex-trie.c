@@ -296,6 +296,8 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
 
 int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFACE
  	assert(pthread_mutex_lock(&trie_mutex)==0);//lock start mutex sections
+	
+	
   // Skip strings of length 0
   if (strlen == 0){
 	  if(node_count>100) pthread_cond_signal(&isFull); //wake up delete_thread
@@ -506,7 +508,7 @@ void check_max_nodes_delThread  () {
   while (node_count > max_count) {
 	  drop_one_node();
   }
-	assert (node_count <= max_count);
+	assert (node_count <= max_count); //test to make sure we are deleting 
 }
 
 void _print (struct trie_node *node) {
