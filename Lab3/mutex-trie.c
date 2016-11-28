@@ -15,9 +15,12 @@ struct trie_node {
 };
 
 static struct trie_node * root = NULL;
-static pthread_mutex_t trie_mutex; //single mutex for trie
 static int node_count = 0;
 static int max_count = 100;  //Try to stay at no more than 100 nodes
+
+pthread_mutex_t trie_mutex;
+pthread_cond_t isFull;
+pthread_cond_t isReady;
 
 struct trie_node * new_leaf (const char *string, size_t strlen, int32_t ip4_address) {
   struct trie_node *new_node = malloc(sizeof(struct trie_node));
@@ -81,13 +84,18 @@ void init(int numthreads) {
   if (numthreads == 1)
     printf("WARNING: This is meant to be used with multiple threads!!!  You have %d!!!\n", numthreads);
 	assert(pthread_mutex_init(&trie_mutex, NULL)==0);//make sure mutex is made
+	assert(pthread_cond_init(&isFull, NULL)==0);//make sure cond var is made
+	assert(pthread_cond_init(&isReady, NULL)==0);//make sure cond var is made
   root = NULL;
 }
 
 void shutdown_delete_thread() {
-  // Don't need to do anything in the sequential case.
+  pthread_mutex_lock(&trie_mutex);
+  pthread_cond_signal(&isFull);//should allow it to terminate gracefully
+  pthread_mutex_unlock(&trie_mutex);
   return;
 }
+
 
 /* Recursive helper function.
  * Returns a pointer to the node if found.
@@ -135,7 +143,7 @@ _search (struct trie_node *node, const char *string, size_t strlen) {
 }
 
 
-int search  (const char *string, size_t strlen, int32_t *ip4_address) {
+int search  (const char *string, size_t strlen, int32_t *ip4_address) { //INTERFACE
   struct trie_node *found;
 	 assert(pthread_mutex_lock(&trie_mutex)==0); //lock beginning of mutex section
   // Skip strings of length 0
@@ -280,7 +288,7 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
   }
 }
 
-int insert (const char *string, size_t strlen, int32_t ip4_address) {
+int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFACE
  	assert(pthread_mutex_lock(&trie_mutex)==0);//lock start mutex sections
   // Skip strings of length 0
   if (strlen == 0){
@@ -295,6 +303,8 @@ int insert (const char *string, size_t strlen, int32_t ip4_address) {
     return 1;
   }
   int ret= _insert (string, strlen, ip4_address, root, NULL, NULL);
+  //only need to check size here....
+	pthread_cond_signal(&isFull); //wake up delete_thread
 	assert(pthread_mutex_unlock(&trie_mutex)==0);//potential unlock
 	return ret;
 }
@@ -395,7 +405,7 @@ _delete (struct trie_node *node, const char *string,
   }
 }
 
-int delete  (const char *string, size_t strlen) {
+int delete  (const char *string, size_t strlen) { //INTERFACE
 	assert(pthread_mutex_lock(&trie_mutex)==0);//lock, start mutex section
   // Skip strings of length 0
   if (strlen == 0){
@@ -419,11 +429,12 @@ int numReachable(struct trie_node *node){ //not Thread-Safe! used for checking t
 	return count;
 }
 
+//INTERFACE
 void checkReachable (){ //not Thread-Safe! used for checking tree after done w/ simulation
 	 assert(numReachable(root)==node_count); //adding in assertion for sequential trie
 }
 
-int max(int a, int b){ //not Thread-Safe! used for checking tree after done w/ simulation
+int max(int a, int b){
 	if(a>b)return a;
 	return b;
 }
@@ -435,7 +446,7 @@ int _depth(struct trie_node *node){ //not Thread-Safe! used for checking tree af
 	count+=_depth(node->children);
 	return max(count,_depth(node->next));
 }
-
+//INTERFACE
 int depth(){ //not Thread-Safe! used for checking tree after done w/ simulation
 	return _depth(root);
 }
@@ -445,6 +456,7 @@ int depth(){ //not Thread-Safe! used for checking tree after done w/ simulation
 /* Find one node to remove from the tree. 
  * Use any policy you like to select the node.
  */
+ //INTERFACE
 int drop_one_node  () { //finding first leaf and killing it
   int oldcount=node_count;
   assert(node_count > max_count);
@@ -472,13 +484,12 @@ int drop_one_node  () { //finding first leaf and killing it
 
 /* Check the total node count; see if we have exceeded a the max.
  */
+ //INTERFACE
 void check_max_nodes  () {
-	assert(pthread_mutex_lock(&trie_mutex)==0);//lock
   while (node_count > max_count) {
 	  drop_one_node();
   }
 	assert (node_count <= max_count);
-	assert(pthread_mutex_unlock(&trie_mutex)==0);//unlock
 }
 
 

@@ -28,6 +28,8 @@ int delete  (const char *string, size_t strlen);
  */
 void check_max_nodes  ();
 
+void shutdown_delete_thread(); //need here so main can call it
+
 void checkReachable (); //check for reachable //not Thread-Safe! used for checking tree after done w/ simulation
 
 int depth();//checks depth of tree //not Thread-Safe! used for checking tree after done w/ simulation
@@ -40,6 +42,10 @@ void print ();
  * a name is available.
  */
 extern int allow_squatting;
+
+extern pthread_cond_t isFull;
+extern pthread_cond_t isReady;
+extern pthread_mutex_t trie_mutex;
 
 
 #endif /* __TRIE_H__ */ 

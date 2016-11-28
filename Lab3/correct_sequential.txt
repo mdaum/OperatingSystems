@@ -1,0 +1,71 @@
+Root is at (nil)
+Num Nodes:0
+Num Reachable:0
+Depth of tree is 0
+inserted google and goggle
+Root is at 0x21fe070
+Node at 0x21fe070.  Key gle, IP 0.  Next (nil), Children 0x21fe0d0
+Node at 0x21fe0d0.  Key gog, IP 4.  Next 0x21fe010, Children (nil)
+Node at 0x21fe010.  Key goo, IP 5.  Next (nil), Children (nil)
+Num Nodes:3
+Num Reachable:3
+Depth of tree is 2
+deleted goggle
+Root is at 0x21fe070
+Node at 0x21fe070.  Key gle, IP 0.  Next (nil), Children 0x21fe010
+Node at 0x21fe010.  Key goo, IP 5.  Next (nil), Children (nil)
+Num Nodes:2
+Num Reachable:2
+Depth of tree is 2
+deleted google
+Root is at (nil)
+Num Nodes:0
+Num Reachable:0
+Depth of tree is 0
+Root is at 0x21fe010
+Node at 0x21fe010.  Key b, IP 0.  Next (nil), Children 0x21fe070
+Node at 0x21fe070.  Key a, IP 2.  Next 0x21fe0d0, Children (nil)
+Node at 0x21fe0d0.  Key b, IP 2.  Next (nil), Children (nil)
+Num Nodes:3
+Num Reachable:3
+Depth of tree is 2
+So far so good
+
+Rv is 1
+Root is at 0x21fe190
+Node at 0x21fe190.  Key but, IP 5.  Next 0x21fe010, Children (nil)
+Node at 0x21fe010.  Key com, IP 2.  Next 0x21fe070, Children (nil)
+Node at 0x21fe070.  Key edu, IP 3.  Next 0x21fe130, Children (nil)
+Node at 0x21fe130.  Key org, IP 4.  Next 0x21fe250, Children (nil)
+Node at 0x21fe250.  Key er, IP 0.  Next 0x21fe430, Children 0x21fe310
+Node at 0x21fe310.  Key t, IP 0.  Next 0x21fe3d0, Children 0x21fe1f0
+Node at 0x21fe1f0.  Key but, IP 6.  Next 0x21fe370, Children (nil)
+Node at 0x21fe370.  Key pin, IP 8.  Next (nil), Children (nil)
+Node at 0x21fe3d0.  Key roll, IP 9.  Next 0x21fe2b0, Children (nil)
+Node at 0x21fe2b0.  Key pinch, IP 7.  Next (nil), Children (nil)
+Node at 0x21fe430.  Key le, IP 0.  Next (nil), Children 0x21fe4f0
+Node at 0x21fe4f0.  Key fi, IP 11.  Next 0x21fe0d0, Children (nil)
+Node at 0x21fe0d0.  Key goog, IP 1.  Next 0x21fe550, Children (nil)
+Node at 0x21fe550.  Key p, IP 0.  Next (nil), Children 0x21fe490
+Node at 0x21fe490.  Key sim, IP 10.  Next 0x21fe5b0, Children (nil)
+Node at 0x21fe5b0.  Key princi, IP 12.  Next (nil), Children (nil)
+Num Nodes:16
+Num Reachable:16
+Depth of tree is 3
+Root is at 0x21fe250
+Node at 0x21fe250.  Key z, IP 0.  Next 0x21fe5b0, Children 0x21fe430
+Node at 0x21fe430.  Key zhri, IP 1.  Next 0x21fe3d0, Children (nil)
+Node at 0x21fe3d0.  Key xzrtjb, IP 6.  Next (nil), Children (nil)
+Node at 0x21fe5b0.  Key s, IP 0.  Next 0x21fe490, Children 0x21fe550
+Node at 0x21fe550.  Key eeonbw, IP 2.  Next 0x21fe4f0, Children (nil)
+Node at 0x21fe4f0.  Key mfpmir, IP 3.  Next (nil), Children (nil)
+Node at 0x21fe490.  Key pzkvlyi, IP 14.  Next (nil), Children (nil)
+Num Nodes:7
+Num Reachable:7
+Depth of tree is 2
+End of self-tests, tree is:
+Root is at (nil)
+Num Nodes:0
+Num Reachable:0
+Depth of tree is 0
+End of self-tests

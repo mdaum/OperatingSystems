@@ -30,8 +30,16 @@ volatile int finished = 0;
 
 static void *
 delete_thread(void *arg) {
-  while (!finished)
+	int num=0;
+	pthread_mutex_lock(&trie_mutex); //must first acquire lock
+  while (!finished){
+	pthread_cond_wait(&isFull,&trie_mutex); 
     check_max_nodes();
+	num++;
+	pthread_cond_signal(&isReady);
+  }
+  pthread_mutex_unlock(&trie_mutex); //in case of race condition where finished occurs while executing loop
+  printf("ran delete_thread %d times\n",num);
   return NULL;
 }
 
@@ -115,7 +123,9 @@ client(void *arg)
      */
 	if (!separate_delete_thread){
 		//checkReachable(); //adding in reachable node test case
+		pthread_mutex_lock(&trie_mutex);
 		check_max_nodes();
+		pthread_mutex_unlock(&trie_mutex);
 		//checkReachable();
 	}	
   }
@@ -390,7 +400,7 @@ int main(int argc, char ** argv) {
   // Wait for all clients to exit.  If we are allowing blocking,
   // cancel the threads, since they may hang forever
   if (separate_delete_thread) {
-   // shutdown_delete_thread(); //uncomment for exercise 3
+    shutdown_delete_thread(); //uncomment for exercise 3
   }
 
   for (i = 0; i < numthreads; i++) {
