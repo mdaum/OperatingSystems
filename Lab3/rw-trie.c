@@ -14,13 +14,13 @@ struct trie_node {
   char key[64]; /* Up to 64 chars */
 };
 
-pthread_rwlock_t trie_rw;
-pthread_cond_t isFull; //used for delete thread
-pthread_mutex_t trie_mutex;//used only for condition var in rw-trie
-
 static struct trie_node * root = NULL;
-int node_count = 0;
+ int node_count = 0;
 static int max_count = 100;  //Try to stay at no more than 100 nodes
+
+pthread_mutex_t trie_mutex;
+pthread_rwlock_t rw;
+pthread_cond_t isFull;
 
 struct trie_node * new_leaf (const char *string, size_t strlen, int32_t ip4_address) {
   struct trie_node *new_node = malloc(sizeof(struct trie_node));
@@ -83,28 +83,27 @@ int compare_keys_substring (const char *string1, int len1, const char *string2, 
 void init(int numthreads) {
   if (numthreads == 1)
     printf("WARNING: This is meant to be used with multiple threads!!!  You have %d!!!\n", numthreads);
-	assert(pthread_rwlock_init(&trie_rw, NULL)==0);//make sure mutex is made
+	assert(pthread_mutex_init(&trie_mutex, NULL)==0);//make sure mutex is made
 	assert(pthread_cond_init(&isFull, NULL)==0);//make sure cond var is made
+	assert(pthread_rwlock_init(&rw, NULL)==0);//make sure cond var is made
   root = NULL;
 }
 
 void shutdown_delete_thread() {
-  puts("init");
-  pthread_mutex_lock(&trie_mutex); //acquire del thread lock
-  pthread_cond_signal(&isFull); //signal thread...
-  pthread_mutex_unlock(&trie_mutex); //release del thread lock
+  pthread_mutex_lock(&trie_mutex);
+  pthread_cond_signal(&isFull);//should allow it to terminate gracefully
+  pthread_mutex_unlock(&trie_mutex);
   return;
 }
 
-void handle_delete_thread(){
-	puts("in del thread");
+void handle_delete_thread(){ //called from main delete_thread
 	pthread_mutex_lock(&trie_mutex); //must first acquire lock
-	while(node_count<=100)pthread_cond_wait(&isFull,&trie_mutex);
-	puts("now not waiting");
+	while(node_count<=100)pthread_cond_wait(&isFull,&trie_mutex); 
     check_max_nodes_delThread();
 	pthread_mutex_unlock(&trie_mutex);
 	return;
 }
+
 
 /* Recursive helper function.
  * Returns a pointer to the node if found.
@@ -116,7 +115,7 @@ struct trie_node *
 _search (struct trie_node *node, const char *string, size_t strlen) {
 	 
   int keylen, cmp;
-  
+
   // First things first, check if we are NULL 
   if (node == NULL) return NULL;
 
@@ -152,18 +151,22 @@ _search (struct trie_node *node, const char *string, size_t strlen) {
 }
 
 
-int search  (const char *string, size_t strlen, int32_t *ip4_address) {
+int search  (const char *string, size_t strlen, int32_t *ip4_address) { //INTERFACE
   struct trie_node *found;
-
+	 assert(pthread_rwlock_rdlock(&rw)==0); //lock beginning of read section
   // Skip strings of length 0
-  if (strlen == 0)
+
+    if (strlen == 0){
+	  assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
     return 0;
-  pthread_rwlock_rdlock(&trie_rw); //acquire read lock...
+  }
+
   found = _search(root, string, strlen);
-	
+  
   if (found && ip4_address)
     *ip4_address = found->ip4_address;
-  pthread_rwlock_unlock(&trie_rw);//release read lock...
+
+assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
 
   return (found != NULL);
 }
@@ -293,48 +296,41 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
   }
 }
 
-int insert (const char *string, size_t strlen, int32_t ip4_address) {
+int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFACE
+ 	assert(pthread_rwlock_wrlock(&rw)==0);//lock start mutex sections
+	
+	
   // Skip strings of length 0
   if (strlen == 0){
-    pthread_rwlock_rdlock(&trie_rw);//acquire read lock
-	if(node_count>100){
-		pthread_mutex_lock(&trie_mutex); //acquire del thread lock
-		pthread_cond_signal(&isFull); //signal thread...
-		pthread_mutex_unlock(&trie_mutex); //release del thread lock
-	}
-	pthread_rwlock_unlock(&trie_rw);//release read lock
-	return 0;
+	  if(node_count>100) {
+		  pthread_mutex_lock(&trie_mutex);
+		  pthread_cond_signal(&isFull); //wake up delete_thread
+		  pthread_mutex_unlock(&trie_mutex);
+	  }
+	  assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
+    return 0;
   }
 
   /* Edge case: root is null */
-  pthread_rwlock_rdlock(&trie_rw);//acquire read lock for root...
   if (root == NULL) {
-	pthread_rwlock_unlock(&trie_rw);//release read lock
-	pthread_rwlock_wrlock(&trie_rw);//acquire write lock
     root = new_leaf (string, strlen, ip4_address);
-	pthread_rwlock_unlock(&trie_rw);//release write lock
-	pthread_rwlock_rdlock(&trie_rw);//acquire read lock
-	if(node_count>100){
-		pthread_mutex_lock(&trie_mutex); //acquire del thread lock
-		pthread_cond_signal(&isFull); //signal thread...
-		pthread_mutex_unlock(&trie_mutex); //release del thread lock
+	if(node_count>100) {
+		pthread_mutex_lock(&trie_mutex);
+		pthread_cond_signal(&isFull); //wake up delete_thread
+		pthread_mutex_unlock(&trie_mutex);
 	}
-	pthread_rwlock_unlock(&trie_rw);//release read lock
+	assert(pthread_rwlock_unlock(&rw)==0);//potential unlock
     return 1;
   }
-  pthread_rwlock_unlock(&trie_rw);//release read lock
-  pthread_rwlock_wrlock(&trie_rw);//acquire write lock
-  int ret =_insert (string, strlen, ip4_address, root, NULL, NULL);
-  pthread_rwlock_unlock(&trie_rw);//release write lock
-  pthread_rwlock_rdlock(&trie_rw);//acquire read lock
-  if(node_count>100){
-	    puts("gonna signal delThread");
-		pthread_mutex_lock(&trie_mutex); //acquire del thread lock
-		pthread_cond_signal(&isFull); //signal thread...
-		pthread_mutex_unlock(&trie_mutex); //release del thread lock
-  }
-	pthread_rwlock_unlock(&trie_rw);//release read lock
-  return ret;
+  int ret= _insert (string, strlen, ip4_address, root, NULL, NULL);
+  //only need to check size here....
+	if(node_count>100){
+		pthread_mutex_lock(&trie_mutex);
+		pthread_cond_signal(&isFull); //wake up delete_thread
+		pthread_mutex_unlock(&trie_mutex);
+	}
+	assert(pthread_rwlock_unlock(&rw)==0);//potential unlock
+	return ret;
 }
 
 /* Recursive helper function.
@@ -433,18 +429,21 @@ _delete (struct trie_node *node, const char *string,
   }
 }
 
-int delete  (const char *string, size_t strlen) {
+int delete  (const char *string, size_t strlen) { //INTERFACE
+	assert(pthread_rwlock_wrlock(&rw)==0);//lock, start mutex section
   // Skip strings of length 0
-  if (strlen == 0)
+  if (strlen == 0){
+	assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
     return 0;
-  pthread_rwlock_wrlock(&trie_rw);//acquire write lock...
-  int ret = (NULL != _delete(root, string, strlen));
-	pthread_rwlock_unlock(&trie_rw);//release write lock...
-  return ret;
+  }
+
+  int ret =(NULL != _delete(root, string, strlen));
+	assert(pthread_rwlock_unlock(&rw)==0);// potential unlock
+	return ret;
 }
 
-//Recursively checks number of reachable nodes using DFS NOT THREAD SAFE
-int numReachable(struct trie_node *node){ 
+//Recursively checks number of reachable nodes using DFS
+int numReachable(struct trie_node *node){ //not Thread-Safe! used for checking tree after done w/ simulation
 	int count=1;
 	if(!node)return 0;
 	if(node->children)
@@ -454,7 +453,8 @@ int numReachable(struct trie_node *node){
 	return count;
 }
 
-void checkReachable (){
+//INTERFACE
+void checkReachable (){ //not Thread-Safe! used for checking tree after done w/ simulation
 	 assert(numReachable(root)==node_count); //adding in assertion for sequential trie
 }
 
@@ -464,21 +464,23 @@ int max(int a, int b){
 }
 
 
-int _depth(struct trie_node *node){ //NOT THREAD SAFE
+int _depth(struct trie_node *node){ //not Thread-Safe! used for checking tree after done w/ simulation
 	int count=1;
 	if(!node)return 0;
 	count+=_depth(node->children);
 	return max(count,_depth(node->next));
 }
-
-int depth(){
+//INTERFACE
+int depth(){ //not Thread-Safe! used for checking tree after done w/ simulation
 	return _depth(root);
 }
+
 
 
 /* Find one node to remove from the tree. 
  * Use any policy you like to select the node.
  */
+ //INTERFACE
 int drop_one_node  () { //finding first leaf and killing it
   int oldcount=node_count;
   assert(node_count > max_count);
@@ -506,22 +508,24 @@ int drop_one_node  () { //finding first leaf and killing it
 
 /* Check the total node count; see if we have exceeded a the max.
  */
+ //INTERFACE
 void check_max_nodes  () {
-	pthread_rwlock_wrlock(&trie_rw);//accquire lock variable in non-delete thread case...
+	pthread_rwlock_wrlock(&rw);
   while (node_count > max_count) {
 	  drop_one_node();
   }
 	assert (node_count <= max_count);
-	pthread_rwlock_unlock(&trie_rw);
+	pthread_rwlock_unlock(&rw);
 }
-
-void check_max_nodes_delThread(){
-	  while (node_count > max_count) {
+//INTERFACE
+void check_max_nodes_delThread  () {
+	pthread_rwlock_wrlock(&rw);
+  while (node_count > max_count) {
 	  drop_one_node();
   }
-	assert (node_count <= max_count);
+	assert (node_count <= max_count); //test to make sure we are deleting 
+	pthread_rwlock_unlock(&rw);
 }
-
 
 void _print (struct trie_node *node) {
   printf ("Node at %p.  Key %.*s, IP %d.  Next %p, Children %p\n", 
@@ -539,6 +543,6 @@ void print() {
     _print(root);
 
  printf("Num Nodes:%d\nNum Reachable:%d\n",node_count,numReachable(root)); //view numNodes at hend
-  int d = depth();
+	  int d = depth();
   printf("Depth of tree is %d\n",d);
-}
+ }
