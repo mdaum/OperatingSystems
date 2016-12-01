@@ -18,7 +18,7 @@
 int separate_delete_thread = 0;
 int simulation_length = 30; // default to 30 seconds
 volatile int finished = 0;
-
+int num=0;
 // Uncomment this line for debug printing
 //#define DEBUG 1
 #ifdef DEBUG
@@ -32,6 +32,7 @@ static void *
 delete_thread(void *arg) {
   while (!finished){
 	handle_delete_thread();//calls trie method...so I can use mutex/cond vars I want per impl
+	num++;
   }
   return NULL;
 }
@@ -403,6 +404,6 @@ int main(int argc, char ** argv) {
 
   checkReachable();//final test to see if you have valid tree
   print();
-  
+  printf("called delete thread %d times\n",num);
   return 0;
 }

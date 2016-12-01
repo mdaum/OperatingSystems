@@ -102,9 +102,7 @@ void shutdown_delete_thread() {
 void handle_delete_thread(){ //called from main delete_thread
 	pthread_mutex_lock(&trie_mutex); //must first acquire lock
 	while(node_count<=100)pthread_cond_wait(&isFull,&trie_mutex); 
-	puts("awake");
     check_max_nodes_delThread();
-	puts("got through");
 	pthread_mutex_unlock(&trie_mutex);
 	return;
 }
@@ -302,12 +300,14 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
 }
 
 int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFACE
+	assert(pthread_mutex_lock(&trie_mutex)==0);
  	assert(pthread_rwlock_wrlock(&rw)==0);//lock start mutex sections
-	puts(" insert has wr lock");
+	//puts(" insert has wr lock");
 	
   // Skip strings of length 0
   if (strlen == 0){
 	  assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
+	  assert(pthread_mutex_unlock(&trie_mutex)==0);
     return 0;
   }
 
@@ -315,21 +315,19 @@ int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFAC
   if (root == NULL) {
     root = new_leaf (string, strlen, ip4_address);
 	if(node_count>100) {
-		pthread_mutex_lock(&trie_mutex);
 		pthread_cond_signal(&isFull); //wake up delete_thread
-		pthread_mutex_unlock(&trie_mutex);
 	}
+	  assert(pthread_mutex_unlock(&trie_mutex)==0);
 	assert(pthread_rwlock_unlock(&rw)==0);//potential unlock
     return 1;
   }
   int ret= _insert (string, strlen, ip4_address, root, NULL, NULL);
   //only need to check size here....
 	if(node_count>100){
-		pthread_mutex_lock(&trie_mutex);
 		pthread_cond_signal(&isFull); //wake up delete_thread
-		pthread_mutex_unlock(&trie_mutex);
 	}
 	assert(pthread_rwlock_unlock(&rw)==0);//potential unlock
+	assert(pthread_mutex_unlock(&trie_mutex)==0);
 	return ret;
 }
 
@@ -431,7 +429,7 @@ _delete (struct trie_node *node, const char *string,
 
 int delete  (const char *string, size_t strlen) { //INTERFACE
 	assert(pthread_rwlock_wrlock(&rw)==0);//lock, start mutex section
-	puts(" insert has wr lock");
+	//puts(" delete has wr lock");
   // Skip strings of length 0
   if (strlen == 0){
 	assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
@@ -511,23 +509,23 @@ int drop_one_node  () { //finding first leaf and killing it
  */
  //INTERFACE
 void check_max_nodes  () {
-	pthread_rwlock_wrlock(&rw);
+	assert(pthread_rwlock_wrlock(&rw)==0);
   while (node_count > max_count) {
 	  drop_one_node();
   }
 	assert (node_count <= max_count);
-	pthread_rwlock_unlock(&rw);
+	assert(pthread_rwlock_unlock(&rw)==0);
 }
 //INTERFACE
 void check_max_nodes_delThread  () {
-	puts("waiting on wr lock");
-	pthread_rwlock_wrlock(&rw);
-	puts("in del thread");
+	//puts("waiting on wr lock");
+	assert(pthread_rwlock_wrlock(&rw)==0);
+//	puts("in del thread");
   while (node_count > max_count) {
 	  drop_one_node();
   }
 	assert (node_count <= max_count); //test to make sure we are deleting 
-	pthread_rwlock_unlock(&rw);
+	assert(pthread_rwlock_unlock(&rw)==0);
 }
 
 void _print (struct trie_node *node) {
