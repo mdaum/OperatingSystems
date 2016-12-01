@@ -90,16 +90,21 @@ void init(int numthreads) {
 }
 
 void shutdown_delete_thread() {
+	puts("in shutdown");
   pthread_mutex_lock(&trie_mutex);
+	puts("got lock");
   pthread_cond_signal(&isFull);//should allow it to terminate gracefully
   pthread_mutex_unlock(&trie_mutex);
+	puts("signalled and unlocked");
   return;
 }
 
 void handle_delete_thread(){ //called from main delete_thread
 	pthread_mutex_lock(&trie_mutex); //must first acquire lock
 	while(node_count<=100)pthread_cond_wait(&isFull,&trie_mutex); 
+	puts("awake");
     check_max_nodes_delThread();
+	puts("got through");
 	pthread_mutex_unlock(&trie_mutex);
 	return;
 }
@@ -298,15 +303,10 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
 
 int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFACE
  	assert(pthread_rwlock_wrlock(&rw)==0);//lock start mutex sections
-	
+	puts(" insert has wr lock");
 	
   // Skip strings of length 0
   if (strlen == 0){
-	  if(node_count>100) {
-		  pthread_mutex_lock(&trie_mutex);
-		  pthread_cond_signal(&isFull); //wake up delete_thread
-		  pthread_mutex_unlock(&trie_mutex);
-	  }
 	  assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
     return 0;
   }
@@ -431,6 +431,7 @@ _delete (struct trie_node *node, const char *string,
 
 int delete  (const char *string, size_t strlen) { //INTERFACE
 	assert(pthread_rwlock_wrlock(&rw)==0);//lock, start mutex section
+	puts(" insert has wr lock");
   // Skip strings of length 0
   if (strlen == 0){
 	assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
@@ -519,7 +520,9 @@ void check_max_nodes  () {
 }
 //INTERFACE
 void check_max_nodes_delThread  () {
+	puts("waiting on wr lock");
 	pthread_rwlock_wrlock(&rw);
+	puts("in del thread");
   while (node_count > max_count) {
 	  drop_one_node();
   }
