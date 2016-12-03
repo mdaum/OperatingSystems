@@ -151,13 +151,10 @@ _search (struct trie_node *node, const char *string, size_t strlen) {
 
 int search  (const char *string, size_t strlen, int32_t *ip4_address) { //INTERFACE
   struct trie_node *found;
-	 assert(pthread_mutex_lock(&trie_mutex)==0); //lock beginning of mutex section
   // Skip strings of length 0
 
-    if (strlen == 0){
-	  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
-    return 0;
-  }
+    if (strlen == 0) return 0;
+	assert(pthread_mutex_lock(&trie_mutex)==0); //lock beginning of mutex section
 
   found = _search(root, string, strlen);
   
@@ -308,7 +305,6 @@ int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFAC
   /* Edge case: root is null */
   if (root == NULL) {
     root = new_leaf (string, strlen, ip4_address);
-	if(node_count>100) pthread_cond_signal(&isFull); //wake up delete_thread
 	assert(pthread_mutex_unlock(&trie_mutex)==0);//potential unlock
     return 1;
   }
@@ -416,13 +412,12 @@ _delete (struct trie_node *node, const char *string,
 }
 
 int delete  (const char *string, size_t strlen) { //INTERFACE
-	assert(pthread_mutex_lock(&trie_mutex)==0);//lock, start mutex section
+
   // Skip strings of length 0
   if (strlen == 0){
-	assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
     return 0;
   }
-
+  assert(pthread_mutex_lock(&trie_mutex)==0);//lock, start mutex section
   int ret =(NULL != _delete(root, string, strlen));
 	assert(pthread_mutex_unlock(&trie_mutex)==0);// potential unlock
 	return ret;

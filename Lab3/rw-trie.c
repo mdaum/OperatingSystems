@@ -156,14 +156,11 @@ _search (struct trie_node *node, const char *string, size_t strlen) {
 
 int search  (const char *string, size_t strlen, int32_t *ip4_address) { //INTERFACE
   struct trie_node *found;
-	 assert(pthread_rwlock_rdlock(&rw)==0); //lock beginning of read section
   // Skip strings of length 0
 
-    if (strlen == 0){
-	  assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
-    return 0;
-  }
+    if (strlen == 0) return 0;
 
+  assert(pthread_rwlock_rdlock(&rw)==0); //lock beginning of read section
   found = _search(root, string, strlen);
   
   if (found && ip4_address)
@@ -301,24 +298,21 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
 
 int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFACE
 	assert(pthread_mutex_lock(&trie_mutex)==0);
- 	assert(pthread_rwlock_wrlock(&rw)==0);//lock start mutex sections
 	//puts(" insert has wr lock");
 	
   // Skip strings of length 0
   if (strlen == 0){
-	  assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
+	  if(node_count>100) pthread_cond_signal(&isFull); //wake up delete_thread
 	  assert(pthread_mutex_unlock(&trie_mutex)==0);
     return 0;
   }
+   	assert(pthread_rwlock_wrlock(&rw)==0);//lock start mutex sections
 
   /* Edge case: root is null */
   if (root == NULL) {
     root = new_leaf (string, strlen, ip4_address);
-	if(node_count>100) {
-		pthread_cond_signal(&isFull); //wake up delete_thread
-	}
-	  assert(pthread_mutex_unlock(&trie_mutex)==0);
 	assert(pthread_rwlock_unlock(&rw)==0);//potential unlock
+	assert(pthread_mutex_unlock(&trie_mutex)==0);
     return 1;
   }
   int ret= _insert (string, strlen, ip4_address, root, NULL, NULL);
