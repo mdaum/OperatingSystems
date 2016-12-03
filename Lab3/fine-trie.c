@@ -121,8 +121,7 @@ _search (struct trie_node *node, const char *string, size_t strlen) {
   int keylen, cmp;
 
   // First things first, check if we are NULL 
-  if (node == NULL) return NULL;
-
+  if (node == NULL) return NULL; //will never try to acquire lock on null node so no worries here
   assert(node->strlen < 64);
 
   // See if this key is a substring of the string passed in
@@ -132,13 +131,17 @@ _search (struct trie_node *node, const char *string, size_t strlen) {
 
     // If this key is longer than our search string, the key isn't here
     if (node->strlen > keylen) {
+	  assert(pthread_mutex_unlock(&node->node_lock)==0); //release node lock before returning
       return NULL;
     } else if (strlen > keylen) {
       // Recur on children list
-      return _search(node->children, string, strlen - keylen);
+	  trie_node * child = node->children;//capture this before unlocking node
+	  if(child!=NULL)assert(pthread_mutex_lock(&child->node_lock)==0);//lock the child before releasing parent
+	  assert(pthread_mutex_unlock(&node->node_lock)==0); //release node lock before returning
+      return _search(child, string, strlen - keylen);
     } else {
       assert (strlen == keylen);
-
+	 assert(pthread_mutex_unlock(&node->node_lock)==0); //release node lock before returning
       return node;
     }
 
@@ -146,9 +149,13 @@ _search (struct trie_node *node, const char *string, size_t strlen) {
     cmp = compare_keys(node->key, node->strlen, string, strlen, &keylen);
     if (cmp < 0) {
       // No, look right (the node's key is "less" than the search key)
-      return _search(node->next, string, strlen);
+	  trie_node * n = node->next//captrue this before unlocking node
+	  if(n!=NULL)assert(pthread_mutex_lock(&n->node_lock)==0);//lock the child before releasing parent
+	  assert(pthread_mutex_unlock(&node->node_lock)==0); //release node lock before returning
+      return _search(n, string, strlen);
     } else {
       // Quit early
+	assert(pthread_mutex_unlock(&node->node_lock)==0); //release node lock before returning
       return 0;
     }
   }
@@ -157,20 +164,18 @@ _search (struct trie_node *node, const char *string, size_t strlen) {
 
 int search  (const char *string, size_t strlen, int32_t *ip4_address) { //INTERFACE
   struct trie_node *found;
-	 assert(pthread_mutex_lock(&trie_mutex)==0); //lock beginning of mutex section
+	
   // Skip strings of length 0
 
     if (strlen == 0){
-	  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
-    return 0;
+		return 0;
   }
-
-  found = _search(root, string, strlen);
+  if(root!=NULL)  assert(pthread_mutex_lock(&node->node_lock)==0);//first lock root outside of recursive function if exists
+  found = _search(root, string, strlen); 
   
   if (found && ip4_address)
     *ip4_address = found->ip4_address;
 
-assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
 
   return (found != NULL);
 }
@@ -240,7 +245,7 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
     int i, cmp2, keylen2, overlap = 0;
     for (i = 1; i < keylen; i++) {
       cmp2 = compare_keys_substring (&node->key[i], node->strlen - i, 
-				     &string[i], strlen - i, &keylen2);
+				     &string[i], sif(child!=NULL)assert(pthread_mutex_lock(&child-node_lock)==0);//lock the child before releasing parenttrlen - i, &keylen2);
       assert (keylen2 > 0);
       if (cmp2 == 0) {
 	overlap = 1;
@@ -300,28 +305,30 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
   }
 }
 
-int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFACE
- 	assert(pthread_mutex_lock(&trie_mutex)==0);//lock start mutex sections
-	
+int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFACE	
 	
   // Skip strings of length 0
   if (strlen == 0){
-	  if(node_count>100) pthread_cond_signal(&isFull); //wake up delete_thread
+	  
+	if(node_count>100){ 
+ 	  assert(pthread_mutex_lock(&trie_mutex)==0);//lock start mutex sections 
+	  pthread_cond_signal(&isFull); //wake up delete_thread
 	  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
+	}
     return 0;
   }
 
   /* Edge case: root is null */
   if (root == NULL) {
     root = new_leaf (string, strlen, ip4_address);
-	if(node_count>100) pthread_cond_signal(&isFull); //wake up delete_thread
-	assert(pthread_mutex_unlock(&trie_mutex)==0);//potential unlock
     return 1;
   }
-  int ret= _insert (string, strlen, ip4_address, root, NULL, NULL);
-  //only need to check size here....
-	if(node_count>100) pthread_cond_signal(&isFull); //wake up delete_thread
-	assert(pthread_mutex_unlock(&trie_mutex)==0);//potential unlock
+  int ret= _insert (string, strlen, ip4_address, root, NULL, NULL); //uses hand-over hand fine-grained locking
+  	if(node_count>100){ 
+ 	  assert(pthread_mutex_lock(&trie_mutex)==0);//lock start mutex sections 
+	  pthread_cond_signal(&isFull); //wake up delete_thread
+	  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
+	}
 	return ret;
 }
 
@@ -333,12 +340,11 @@ int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFAC
  */
 struct trie_node * 
 _delete (struct trie_node *node, const char *string, 
-	 size_t strlen) {
+	 size_t strlen) { //not doing hand over hand....locking the root here as suggested in piazza
   int keylen, cmp;
 
   // First things first, check if we are NULL 
   if (node == NULL) return NULL;
-
   assert(node->strlen < 64);
 
   // See if this key is a substring of the string passed in
@@ -348,6 +354,7 @@ _delete (struct trie_node *node, const char *string,
 
     // If this key is longer than our search string, the key isn't here
     if (node->strlen > keylen) {
+	  assert(pthread_mutex_unlock(&node->node_lock)==0);//unlock before returning
       return NULL;
     } else if (strlen > keylen) {
       struct trie_node *found =  _delete(node->children, string, strlen - keylen);
@@ -421,16 +428,14 @@ _delete (struct trie_node *node, const char *string,
   }
 }
 
-int delete  (const char *string, size_t strlen) { //INTERFACE
-	assert(pthread_mutex_lock(&trie_mutex)==0);//lock, start mutex section
+int delete  (const char *string, size_t strlen) { //INTERFACE not doing hand-over-hand here...locking whole path as suggested in piazza
   // Skip strings of length 0
   if (strlen == 0){
-	assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
     return 0;
   }
-
+  if(root!=NULL)assert(pthread_mutex_lock(&root->node_lock)==0);//lock root before entering recursive method
   int ret =(NULL != _delete(root, string, strlen));
-	assert(pthread_mutex_unlock(&trie_mutex)==0);// potential unlock
+    if(root!=NULL)assert(pthread_mutex_unlock(&root->node_lock)==0);//unlock root after
 	return ret;
 }
 
