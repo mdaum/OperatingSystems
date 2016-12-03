@@ -422,16 +422,19 @@ _delete (struct trie_node *node, const char *string,
 }
 
 int delete  (const char *string, size_t strlen) { //INTERFACE
+	assert(pthread_mutex_lock(&trie_mutex)==0);//lock for delete thread mutex....want good node_count reading
 	assert(pthread_rwlock_wrlock(&rw)==0);//lock, start mutex section
 	//puts(" delete has wr lock");
   // Skip strings of length 0
   if (strlen == 0){
 	assert(pthread_rwlock_unlock(&rw)==0); //potential unlock
+	assert(pthread_mutex_unlock(&trie_mutex)==0);//potential unlock delete thread mutex
     return 0;
   }
 
   int ret =(NULL != _delete(root, string, strlen));
 	assert(pthread_rwlock_unlock(&rw)==0);// potential unlock
+	assert(pthread_mutex_unlock(&trie_mutex)==0);//unlock delete thread mutex
 	return ret;
 }
 
