@@ -25,6 +25,8 @@ static int max_count = 100;  //Try to stay at no more than 100 nodes
 
 pthread_mutex_t trie_mutex;
 pthread_cond_t isFull;
+pthread_mutex_t node_count_mutex;//used for node_count
+pthread_mutex_t rootex;//used for null root
 
 struct trie_node * new_leaf (const char *string, size_t strlen, int32_t ip4_address) { //only time node is ever created....
   struct trie_node *new_node = malloc(sizeof(struct trie_node));
@@ -45,6 +47,19 @@ struct trie_node * new_leaf (const char *string, size_t strlen, int32_t ip4_addr
 
   return new_node;
 }
+
+// Compare strings backward.  Unlike strncmp, we assume
+// that we will not stop at a null termination, only after
+// n chars (or a difference).  Base code borrowed from musl
+int reverse_strncmp(const char *left, const char *right, size_t n)
+{
+    const unsigned char *l= (const unsigned char *) &left[n-1];
+    const unsigned char *r= (const unsigned char *) &right[n-1];
+    if (!n--) return 0;
+    for (; *l && *r && n && *l == *r ; l--, r--, n--);
+    return *l - *r;
+}
+
 
 int compare_keys (const char *string1, int len1, const char *string2, int len2, int *pKeylen) {
     int keylen, offset;
@@ -71,7 +86,7 @@ int compare_keys (const char *string1, int len1, const char *string2, int len2, 
     assert (keylen > 0);
     if (pKeylen)
       *pKeylen = keylen;
-    return strncmp(string1, string2, keylen);
+    return reverse_strncmp(string1, string2, keylen);
 }
 
 int compare_keys_substring (const char *string1, int len1, const char *string2, int len2, int *pKeylen) {
@@ -82,7 +97,7 @@ int compare_keys_substring (const char *string1, int len1, const char *string2, 
   assert (keylen > 0);
   if (pKeylen)
     *pKeylen = keylen;
-  return strncmp(&string1[offset1], &string2[offset2], keylen);
+  return reverse_strncmp(&string1[offset1], &string2[offset2], keylen);
 }
 
 void init(int numthreads) {
@@ -90,6 +105,8 @@ void init(int numthreads) {
     printf("WARNING: This is meant to be used with multiple threads!!!  You have %d!!!\n", numthreads);
 	assert(pthread_mutex_init(&trie_mutex, NULL)==0);//make sure mutex is made
 	assert(pthread_cond_init(&isFull, NULL)==0);//make sure cond var is made
+	assert(pthread_mutex_init(&node_count_mutex, NULL)==0);//make sure mutex is made
+	assert(pthread_mutex_init(&rootex, NULL)==0);//make sure mutex is made
   root = NULL;
 }
 
@@ -180,8 +197,8 @@ int search  (const char *string, size_t strlen, int32_t *ip4_address) { //INTERF
 
 /* Recursive helper function */
 int _insert (const char *string, size_t strlen, int32_t ip4_address, 
-	     struct trie_node *node, struct trie_node *parent, struct trie_node *left) { //root is locked before entering first time from insert...
-																					//prior to future calls...guaranteed node, parent, left are locked if they exist
+	     struct trie_node *node, struct trie_node *parent, struct trie_node *left) {
+
   int cmp, keylen;
 
   // First things first, check if we are NULL 
@@ -199,13 +216,15 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
       struct trie_node *new_node;
 
       assert(keylen == strlen);
-      assert((!parent) || parent->children == node); 
+      assert((!parent) || parent->children == node);
 
       new_node = new_leaf (string, strlen, ip4_address);
-	  assert(pthread_mutex_lock(&new_node->node_lock)==0);//lock the newly created node
       node->strlen -= keylen;
-      new_node->children = node; //will already be locked upon entering method...
-      assert ((!parent) || (!left)); //can't have both...be careful with locks here... either should be locked upon entering method
+      new_node->children = node;
+	  new_node->next = node->next;
+	  node->next=NULL;
+
+      assert ((!parent) || (!left));
 
       if (parent) {
 	parent->children = new_node;
@@ -214,10 +233,6 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
       } else if ((!parent) || (!left)) {
 	root = new_node;
       }
-	  if(parent) assert(pthread_mutex_unlock(&parent->node_lock)==0);//unlock the parent node if exists
-	  if(left)assert(pthread_mutex_unlock(&left->node_lock)==0);//unlock the left node if exists
-	  assert(pthread_mutex_unlock(&node->node_lock)==0);//unlock node....not referenced anymore
-	  assert(pthread_mutex_unlock(&new_node->node_lock)==0);//unlock the new node
       return 1;
 
     } else if (strlen > keylen) {
@@ -226,15 +241,9 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
 	// Insert leaf here
 	struct trie_node *new_node = new_leaf (string, strlen - keylen, ip4_address);
 	node->children = new_node;
-	assert(pthread_mutex_unlock(&node->node_lock)==0);//unlock node
-	if(parent)assert(pthread_mutex_unlock(&parent->node_lock)==0);//unlock the parent node if exists
-	if(left)assert(pthread_mutex_unlock(&left->node_lock)==0);//unlock the left node if exists
 	return 1;
       } else {
 	// Recur on children list, store "parent" (loosely defined)
-	  assert(pthread_mutex_lock(&node->children->node_lock)==0);//lock the child node...node will stay locked as parent in next iteration...
-	  if(parent)assert(pthread_mutex_unlock(&parent->node_lock)==0);//unlock the parent node if exists
-	  if(left)assert(pthread_mutex_unlock(&left->node_lock)==0);//unlock the left node if exists
       return _insert(string, strlen - keylen, ip4_address,
 		     node->children, node, NULL);
       }
@@ -242,15 +251,9 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
       assert (strlen == keylen);
       if (node->ip4_address == 0) {
 	node->ip4_address = ip4_address;
-	if(parent)assert(pthread_mutex_unlock(&parent->node_lock)==0);//unlock the parent node if exists
-	if(left)assert(pthread_mutex_unlock(&left->node_lock)==0);//unlock the left node if exists
-	assert(pthread_mutex_unlock(&node->node_lock)==0);//unlock node
 	return 1;
       } else {
-			if(parent)assert(pthread_mutex_unlock(&parent->node_lock)==0);//unlock the parent node if exists
-			if(left)assert(pthread_mutex_unlock(&left->node_lock)==0);//unlock the left node if exists
-			assert(pthread_mutex_unlock(&node->node_lock)==0);//unlock node
-			return 0;
+	return 0;
       }
     }
 
@@ -271,13 +274,12 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
       // Insert a common parent, recur
       int offset = strlen - keylen2;
       struct trie_node *new_node = new_leaf (&string[offset], keylen2, 0);
-	  assert(pthread_mutex_lock(&new_node->node_lock)==0);//lock newly created node
       assert ((node->strlen - keylen2) > 0);
       node->strlen -= keylen2;
       new_node->children = node;
       new_node->next = node->next;
       node->next = NULL;
-      assert ((!parent) || (!left)); //will already have lock for these if exists
+      assert ((!parent) || (!left));
 
       if (node == root) {
 	root = new_node;
@@ -286,37 +288,27 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
 	parent->children = new_node;
       } else if (left) {
 	left->next = new_node;
-	
       } else if ((!parent) && (!left)) {
 	root = new_node;
       }
-	 if(parent)pthread_mutex_unlock(&parent->node_lock);//unlock the parent node if exists
-	 if(left) assert(pthread_mutex_unlock(&left->node_lock)==0);//unlock the left node
+
       return _insert(string, offset, ip4_address,
-		     node, new_node, NULL); //keep node and new_node locked for next iteration...
+		     node, new_node, NULL);
     } else {
       cmp = compare_keys (node->key, node->strlen, string, strlen, &keylen);
       if (cmp < 0) {
 	// No, recur right (the node's key is "less" than  the search key)
-	if (node->next){
-	  assert(pthread_mutex_lock(&node->next->node_lock)==0);//lock node->next before passing it into recursive call
-	  if(parent)assert(pthread_mutex_unlock(&parent->node_lock)==0);//unlock the parent node if exists
-	  if(left)assert(pthread_mutex_unlock(&left->node_lock)==0);//unlock the left node if exists
-	  return _insert(string, strlen, ip4_address, node->next, NULL, node); //keeping node and node->next locked for next iteration
-	}
+	if (node->next)
+	  return _insert(string, strlen, ip4_address, node->next, NULL, node);
 	else {
 	  // Insert here
 	  struct trie_node *new_node = new_leaf (string, strlen, ip4_address);
 	  node->next = new_node;
-	  if(parent)assert(pthread_mutex_unlock(&parent->node_lock)==0);//unlock the parent node if exists
-	  if(left)assert(pthread_mutex_unlock(&left->node_lock)==0);//unlock the left node if exists
-	  assert(pthread_mutex_unlock(&node->node_lock)==0);//unlock node
 	  return 1;
 	}
       } else {
 	// Insert here
 	struct trie_node *new_node = new_leaf (string, strlen, ip4_address);
-	assert(pthread_mutex_lock(&new_node->node_lock)==0);//lock newly made node
 	new_node->next = node;
 	if (node == root)
 	  root = new_node;
@@ -324,19 +316,14 @@ int _insert (const char *string, size_t strlen, int32_t ip4_address,
 	  parent->children = new_node;
 	else if (left && left->next == node)
 	  left->next = new_node;
-  
-	assert(pthread_mutex_unlock(&new_node->node_lock)==0);//unlock new node
       }
     }
-	if(parent)assert(pthread_mutex_unlock(&parent->node_lock)==0);//unlock the parent node if exists
-    if(left)assert(pthread_mutex_unlock(&left->node_lock)==0);//unlock the left node if exists
-	assert(pthread_mutex_unlock(&node->node_lock)==0);//unlock node
     return 1;
   }
 }
 
 int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFACE	
-	
+	//puts("in insert");
   // Skip strings of length 0
   if (strlen == 0){
 	  
@@ -349,13 +336,17 @@ int insert (const char *string, size_t strlen, int32_t ip4_address) { //INTERFAC
   }
 
   /* Edge case: root is null */
+  assert(pthread_mutex_lock(&rootex)==0);
   if (root == NULL) {
     root = new_leaf (string, strlen, ip4_address);
+	assert(pthread_mutex_unlock(&rootex)==0);
     return 1;
   }
-   if(root!=NULL)  assert(pthread_mutex_lock(&root->node_lock)==0);//first lock root outside of recursive function if exists...it should otherwise failed assertion in _insert
+    assert(pthread_mutex_unlock(&rootex)==0);
+  assert(pthread_mutex_lock(&root->node_lock)==0);//first lock root outside of recursive function if exists...it should otherwise failed assertion in _insert
   int ret= _insert (string, strlen, ip4_address, root, NULL, NULL); //uses hand-over hand fine-grained locking
-  	if(node_count>100){ 
+  assert(pthread_mutex_unlock(&root->node_lock)==0);
+	if(node_count>100){ 
  	  assert(pthread_mutex_lock(&trie_mutex)==0);//lock start mutex sections 
 	  pthread_cond_signal(&isFull); //wake up delete_thread
 	  assert(pthread_mutex_unlock(&trie_mutex)==0); //potential unlock
@@ -509,7 +500,7 @@ int depth(){ //not Thread-Safe! used for checking tree after done w/ simulation
  */
  //INTERFACE
 int drop_one_node  () { //finding first leaf and killing it...hand over hand locking (except holding on 2 parent and child locks)
-  int oldcount=node_count;
+//puts("in drop node");
   assert(node_count > max_count);
 	struct trie_node *b4Temp = NULL; 
 	assert(pthread_mutex_lock(&root->node_lock)==0);//lock root
@@ -534,7 +525,6 @@ int drop_one_node  () { //finding first leaf and killing it...hand over hand loc
 	assert(pthread_mutex_unlock(&temp->node_lock)==0);//unlock temp
 	free(temp);
 	node_count--;
-  assert(node_count==oldcount-1);
   return 1;
 }
 
