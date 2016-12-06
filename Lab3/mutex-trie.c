@@ -1,4 +1,6 @@
-/* A (reverse) trie with trie-wide mutual exclusion. */
+/* A (reverse) trie with trie-wide mutual exclusion. 
+ * Additions to boiler plate made by Maxwell Daum. Honor Code: I did not give or recieve any unauthorized help during this assignment.
+ */
 #include <pthread.h>
 #include <stddef.h>
 #include <stdio.h>

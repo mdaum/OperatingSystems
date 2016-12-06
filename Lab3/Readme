@@ -1,0 +1,48 @@
+Programmer: Maxwell Daum
+Honor Code: I did not give or recieve any unauthorized help during this assignment.
+
+NOTE: I MODIFY trie.h and main...please use mine!!!!
+
+Exercise 1: Pretty straightforward, in my drop one node I simply shimmy down to the first childless node and delete it, easy bookeeping, and make locking
+that method quite easy in later exercises. Added in a isReachable test in main that is used in
+this exercise and future ones to make sure I have not corrupted the data structure.
+
+Exercise 2: Added quite a few assertions to the code base as I wrapped the critical sections in a single mutex
+these served as good indicators in future exercises when I had corrupted the data structure.
+
+Exercise 3: I was able to achieve delete thread in my dns-mutex still with only one mutex,
+because of this, when the condition variable is triggered, the delete thread wakes up and will
+attempt to grab the lock, along with the other X threads trying to obtain that lock for tree
+operations. Because of this, the tree's height would not always stay under 100, but I can confirm
+that the delete thread essentially tries its best to play catch with the other threads hammering the tree
+with inserts. Since the other threads are joined first, the delete thread is able to delete quite a few
+nodes and gets it close to 100, before closing (Dr.Porter said this was fine). I tested this by adding in assertions on node_count, which I have since
+removed since sometimes the tree can get quite large (especially when there are 16 threads fighting for the lock).
+One easy way to prove my delete thread is indeed running and contesting that one mutex is observe my output when running
+dns-mutex -l 4 -c 003 -t ... at the end of a run I print out the (small) ending trie and I print out the number of times
+the delete thread runs, that is to say the number of times check_max_nodes is called from the delete thread.
+It is only called when node_count>100 due to my conditional variable. You will note the number of times is in the 100s of k
+However, if you run dns-mutex -l 4 -c 016 -t you will see that number has mostly dropped below 100 k. This is a clear indication
+of what I mentioned prior. My delete thread is contesting the lock with every other thread trying to grab upon waking, and will continue
+to wait for it until acquired, and then it will sleep again. Also used the isReachable test case here to make sure
+I was not corrupting the data structure.
+
+Exercise 4: Fairly trivial extension. I did encounter deadlock since I now had a rw mutex and a regular mutex for my delete thread.
+However, I simply followed the best practice guidlines in class by always acquiring mutexes in the same order and it was fine.
+
+Exercise 5: Did quite a bit here, and I have a running dns-fine that works with or without the delete thread.
+However, due to some of the recursive calls and changes to the root pointer, my locking was coarser than I would have liked.
+If the root pointer was not so volatile and subject to undefined behaviour throughout the run I feel that I could have gotten things
+much finer. But after spending 3 full days on this I took what I could get.
+First off, I initialize a mutex for each and every node, added these to the struct and initialize them in new_leaf method.
+Then I created two mutexes, one for each of our shared memory variables, struct trie_node * root and node_count.
+Then I proceeded to do hand-over hand locking for search,insert, check_max_nodes, and drop_one_node, and simply lock the trie in delete as per the recommendation
+on sakai, since the method is quite nasty. Everything except for insert proved quite simple, but once I got into the insert methods,
+things got pretty wonky. I tried to uphold this invariant upon every call to _insert: prior to _insert call, node, parent, and left will be locked if they exist.
+So the only locking I do is on new nodes, node->children (in one case) or node->next (in one case). Then I unlock all nodes that will not be passed
+onto the next recursive call, and unlock everything when returning a terminal. After doing this I was still running into deadlock when running with multiple threads (single thread was fine, not stepping on my own toes there). This seemed to be because
+we have a few cases where we may change our root pointer. So the question was, when in the recursive function can we determine we are safe to release our root * lock?
+After many office hour visits and discussing with my peers at a high level (no code sharing of any kind), no answers came.
+So I had to settle and keep the root pointer locked for most of the insert method, shorting it where I could. Because of this, I had to do the same
+to my other two methods, which I already had good hand-over-hand locking. While disappointing, I again think I learned quite a bit
+about locks, critical sections and the like and have picked up a marketable skill. Was a fun assignment!!

@@ -1,4 +1,6 @@
-/* A simple, (reverse) trie.  Only for use with 1 thread. */
+/* A simple, (reverse) trie.  Only for use with 1 thread. 
+ * Additions to boiler plate made by Maxwell Daum. Honor Code: I did not give or recieve any unauthorized help during this assignment.
+*/
 #include <pthread.h>
 #include <stddef.h>
 #include <stdio.h>

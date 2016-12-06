@@ -3,7 +3,7 @@
  * Don Porter - porter@cs.unc.edu
  * 
  * COMP 530 - University of North Carolina, Chapel Hill
- * 
+ *  * Additions to boiler plate made by Maxwell Daum. Honor Code: I did not give or recieve any unauthorized help during this assignment.
  */
 
 #include <pthread.h>

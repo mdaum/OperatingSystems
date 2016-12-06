@@ -20,3 +20,5 @@ dns-fine: main.c fine-trie.o
 
 clean:
 	rm -f *~ *.o dns-sequential dns-mutex dns-rw dns-fine out.txt
+
+ # Additions to boiler plate made by Maxwell Daum. Honor Code: I did not give or recieve any unauthorized help during this assignment.

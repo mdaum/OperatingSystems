@@ -4,7 +4,9 @@
 #include <stdint.h>
 #include <assert.h>
 
-/* A simple (reverse) trie interface */
+/* A simple (reverse) trie interface 
+ * Additions to boiler plate made by Maxwell Daum. Honor Code: I did not give or recieve any unauthorized help during this assignment.
+*/
 
 /* Optional init routine.  May not be required. */
 void init (int numthreads);

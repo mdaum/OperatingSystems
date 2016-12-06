@@ -1,4 +1,6 @@
-/* A (reverse) trie with reader-writer locks. */
+/* A (reverse) trie with reader-writer locks. 
+ * Additions to boiler plate made by Maxwell Daum. Honor Code: I did not give or recieve any unauthorized help during this assignment.
+*/
 #include <pthread.h>
 #include <stddef.h>
 #include <stdio.h>

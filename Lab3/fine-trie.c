@@ -2,6 +2,7 @@
  *
  * Hint: We recommend using a hand-over-hand protocol to order your locks,
  * while permitting some concurrency on different subtrees.
+ * Additions to boiler plate made by Maxwell Daum. Honor Code: I did not give or recieve any unauthorized help during this assignment.
  */
 #include <pthread.h>
 #include <stddef.h>
